@@ -6,12 +6,19 @@ import time
 import struct
 import traceback
 
+DDC2BI3_VCP_PREFIX = '\xc2\x00\x00'
+
+VENDOR_ID = 0x0424
+PRODUCT_ID = 0x4060
+
+
 class CommandBlock:
     """
     Class for building Command Block Wrapper (CBW) USB packets. See
     http://www.usb.org/developers/docs/devclass_docs/usbmassbulk_10.pdf
     for documentation.
     """
+
     def __init__(self, tag, transLen, flags, lun, cbStr):
         self._sig = "\x55\x53\x42\x43"
         self._tag = tag
@@ -34,44 +41,52 @@ class CommandBlock:
     def __str__(self):
         return binascii.hexlify(self.ret_bin())
 
+
 class USBI2CWritePacket:
     """
     Class for building a USB Mass Storage Bulk Write packet that sends an i2c write.
     """
+
+    pak_type = '\x01'  # i2c write
+
     def __init__(self, unk_header, dest_addr, payload):
-        self._type = '\x01' # i2c write
         self._dest_addr = struct.pack(">B", dest_addr)
         self._len_str = struct.pack(">B", len(payload))
         self._unk_header = unk_header
         self._payload = payload
 
     def toBytes(self):
-        payload = self._type + self._dest_addr + '\xc0\x00' + self._len_str \
-                + self._unk_header + self._payload
+        payload = self.pak_type + self._dest_addr + '\xc0\x00' + self._len_str \
+            + self._unk_header + self._payload
         return payload
+
 
 class USBI2CReadPacket:
     """
     Class for building a USB Mass Storage Bulk Read packet that reads i2c data.
-    To actually get the data, you need to send a CBW with the special 'i2c
+    To get the response data, you need to send a CBW with the special 'i2c
     read' command.
     """
-    def __init__(self, src_addr, bytes):
-        self._type = '\x02' # i2c read
+
+    pak_type = '\x02'  # i2c read
+
+    def __init__(self, src_addr, pak_bytes):
         self._src_addr = struct.pack(">B", src_addr)
-        self._bytes = struct.pack(">B", bytes)
+        self._bytes = struct.pack(">B", pak_bytes)
 
     def toBytes(self):
-        payload = self._type + self._src_addr + self._bytes + '\xc0\x00'
+        payload = self.pak_type + self._src_addr + self._bytes + '\xc0\x00'
         return payload
+
 
 class CommandPacket:
     """
     Class for building a DDC2Bi (i2c) packet that carries a GProbe payload.
     """
+
     def __init__(self, payload,
-                 vcp_prefix='\xc2\x00\x00'):
-        self._ddc_source = '\x51'
+                 vcp_prefix=DDC2BI3_VCP_PREFIX):
+        self._ddc_source = '\x51'       # as per gprobe documentation
         self._len_payload = chr(0x80 | (len(vcp_prefix) + len(payload)))
         self._vcp_prefix = vcp_prefix
         self._payload = payload
@@ -92,13 +107,15 @@ class CommandPacket:
 
     def toBytes(self):
         return self._ddc_source + self._len_payload + self._vcp_prefix + \
-                self._payload + self._checksum
+            self._payload + self._checksum
+
 
 class CommandPayload:
     """
     Class for building a GProbe packet. See the GProbe documentation for
     details on the different command types.
     """
+
     def __init__(self, cmd_type, cmd_payload):
         self._cmd_type = cmd_type
         self._cmd_payload = cmd_payload
@@ -109,6 +126,7 @@ class CommandPayload:
         return len_str + self._cmd_type + self._cmd_payload
 
 VERBOSE = False
+
 
 class Dell2410:
     """
@@ -122,6 +140,10 @@ class Dell2410:
         print dev.reg_read(0xc800)
         dev.debug_off() # returns control to the firmware, so that e.g. buttons work
     """
+    payload_len = 512
+    scsi_cmd_opcode = "\xcf"
+    padding_byte = "\xcc"
+
     def __init__(self, verbose=VERBOSE):
         self.verbose = verbose
         self.dev = None
@@ -132,7 +154,7 @@ class Dell2410:
 
     def _hook(self):
         try:
-            self.dev = usb.core.find(idVendor=0x0424, idProduct=0x4060)
+            self.dev = usb.core.find(idVendor=VENDOR_ID, idProduct=PRODUCT_ID)
         except Exception as e:
             if self.verbose:
                 traceback.print_exc()
@@ -150,7 +172,6 @@ class Dell2410:
     def _release(self):
         if self.dev is None:
             return
-        # Do we still need this?
         import time
         time.sleep(2)
         try:
@@ -175,26 +196,29 @@ class Dell2410:
         self._parse_response(resp[1])
         print("resp3: " + binascii.hexlify(resp[2]))
 
-    def _do_cmd(self, bytes):
+    def _do_cmd(self, cmd_bytes):
         if self.verbose:
-            print binascii.hexlify(bytes)
+            print binascii.hexlify(cmd_bytes)
 
-        payload_padd = 512 - len(bytes)
-        bytes = bytes + payload_padd * '\xcc'
+        payload_padd = self.payload_len - len(cmd_bytes)
+        cmd_bytes = cmd_bytes + payload_padd * self.padding_byte
 
-        cb_send_i2c = "\xcf\x20" + '\x00' * 14  # magic cmd block to send i2c request
-        cmd_send_i2c = CommandBlock(12, 512, 0x00, 0, cb_send_i2c)
-        cb_recv_i2c = "\xcf\x21" + '\x00' * 14  # magic cmd block to receive i2c response
-        cmd_recv_i2c = CommandBlock(12, 512, 0x80, 0, cb_recv_i2c)
+        # magic cmd block to send i2c request
+        cb_send_i2c = self.scsi_cmd_opcode + "\x20" + '\x00' * 14
+        cmd_send_i2c = CommandBlock(12, self.payload_len, 0x00, 0, cb_send_i2c)
+
+        # magic cmd block to receive i2c response
+        cb_recv_i2c = self.scsi_cmd_opcode + "\x21" + '\x00' * 14
+        cmd_recv_i2c = CommandBlock(12, self.payload_len, 0x80, 0, cb_recv_i2c)
 
         # Timeout values should be at least 5000ms
         self.dev.write(0x2, cmd_send_i2c.ret_bin(), 5000)
-        self.dev.write(0x2, bytes, 5000)
-        usb_resp = self.dev.read(0x82, 512, 5000)
+        self.dev.write(0x2, cmd_bytes, 5000)
+        usb_resp = self.dev.read(0x82, self.payload_len, 5000)
 
         self.dev.write(0x2, cmd_recv_i2c.ret_bin())
-        i2c_data = self.dev.read(0x82, 512, 5000)
-        usb_resp_2 = self.dev.read(0x82, 512, 5000)
+        i2c_data = self.dev.read(0x82, self.payload_len, 5000)
+        usb_resp_2 = self.dev.read(0x82, self.payload_len, 5000)
 
         resp = (usb_resp, i2c_data, usb_resp_2)
 
@@ -207,12 +231,10 @@ class Dell2410:
         data = USBI2CWritePacket(unk_header,
                                  address,
                                  cmd_bytes).toBytes()
-
         self._do_cmd(data)
 
     def _i2c_read(self, addr, num_bytes):
         packet = USBI2CReadPacket(addr, num_bytes)
-
         i2c_data = self._do_cmd(packet.toBytes())
         # the first two bytes of the response seems to be USB header
         return i2c_data[2:2 + num_bytes]
@@ -240,11 +262,14 @@ class Dell2410:
         return bytes[3:]
 
     def initialize(self):
-        pad_len = 512 - len('\x0f\xff')
-        is_ready_cmd = '\x0f\xff' + '\xcc' * pad_len
+        ready_cmd = '\x0f\xff'
+        pad_len = self.payload_len - len(ready_cmd)
+        is_ready_cmd = ready_cmd + self.padding_byte * pad_len
         # Send the ready1 command
         # This should return 0400*511
         val = self._do_cmd(is_ready_cmd)
+        if self.verbose:
+            self._print_response(val)
         time.sleep(0.03)
         # Send the ready2 command
         # This should return 0400*511
@@ -266,12 +291,6 @@ class Dell2410:
                                           chr(index) + struct.pack(">I", val)).toBytes())
         return cp
 
-    def read_addr(self, addr, lenVal=32):
-        cp = CommandPacket('\xf9',
-                           CommandPayload('\x14',
-                                          struct.pack(">H", addr) + chr(lenVal)).toBytes())
-        return cp
-
     def debug_on(self):
         self._send_gprobe_cmd('\xf9', '\x09', '')
 
@@ -290,7 +309,7 @@ class Dell2410:
 
     def flash_read(self, address, byte_count):
         self._send_gprobe_cmd('\x00', '\x1b', struct.pack(">H", address) +
-                                              struct.pack(">B", byte_count))
+                              struct.pack(">B", byte_count))
 
     def reg_read(self, address):
         self._send_gprobe_cmd('\x0a', '\x06', struct.pack(">H", address))
@@ -299,7 +318,7 @@ class Dell2410:
 
     def reg_write(self, address, value):
         self._send_gprobe_cmd('\x0a', '\x07', struct.pack(">H", address) +
-                                              struct.pack(">H", value))
+                              struct.pack(">H", value))
 
     def reset(self):
         self._send_gprobe_cmd('\xf9', '\x20', '\x00')

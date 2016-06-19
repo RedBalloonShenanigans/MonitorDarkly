@@ -9,6 +9,7 @@ except:
 THIS_PATH = os.path.dirname(os.path.realpath(__file__))
 IMAGE_PATH = os.path.join(THIS_PATH, "../images")
 
+
 def command(cmd, msg):
     try:
         subprocess.check_output(cmd, stderr=subprocess.STDOUT, shell=True)
@@ -18,7 +19,10 @@ def command(cmd, msg):
         print("#" * 80)
         raise Exception(msg)
 
+
 class DellImage:
+    # max size supported right now.
+    max_image_size = 256000
 
     def __init__(self, filename, width=None, height=None, transparency=None):
         self.filename = os.path.join(IMAGE_PATH, filename)
@@ -41,15 +45,10 @@ class DellImage:
                 self.height -= 1
             # Minumum and maximum
             # Maximum size is based on experimentation, real value is unknown at this time
-            if self.width <= 0 or self.height <= 0 or (self.width * self.height) > 256000:
+            if self.width <= 0 or self.height <= 0 or \
+                    (self.width * self.height) > self.max_image_size:
                 raise Exception("Invalid image size {0} x {1}".format(self.width, self.height))
             # Figure out how to use this properly?!?!
-            '''
-            with img.convert("PCX") as i:
-                i.resize(self.width, self.height)
-                i.depth = 8
-                i.compression_quality = 0
-            '''
         # Backup solution
         fd, fileout = tempfile.mkstemp(suffix=".pcx")
         os.close(fd)
@@ -83,14 +82,10 @@ class DellImage:
                     b += 1
             image += chr(b)
         # 0 padding, not sure why yet, but this can cause issues
-        # image = image[:-50] + "\x00" * 50
         image += "\x00" * 100
-        # print " ".join("{:02x}".format(ord(c)) for c in image)
-        # print(len(image))
         palette = self.raw_data[-768:-768 + (16 * 3)]
         table = ""
         for i in range(16):
             index = i * 3
             table += palette[index] + chr(0) + palette[index + 2] + palette[index + 1]
-        # print " ".join("{:02x}".format(ord(c)) for c in table)
         return image, table

@@ -2,7 +2,7 @@
 
 from select import poll, POLLERR, POLLPRI
 from os import system, path
-from time import sleep, time 
+from time import sleep, time
 import sys
 import protocol
 import demo
@@ -29,7 +29,7 @@ for i in range(1, 8):
 
 # GPIO files in sysfs
 GPIO_VAL = "value"
-GPIO_EDG = "edge" 
+GPIO_EDG = "edge"
 GPIO_DIR = "direction"
 
 # GPIO direction settings in sysfs
@@ -40,9 +40,11 @@ EDGE_RISE = "rising"
 EDGE_FALL = "falling"
 EDGE_NONE = "none"
 
+
 def grab_led():
     with open(LED_PREFIX + LED_TRIGGER, "w") as fp:
         fp.write("none")
+
 
 def blink_led(count, delay, launch):
     for i in range(count << 1):
@@ -58,6 +60,7 @@ def blink_led(count, delay, launch):
         if ATTACK < 6:
             attack_funcs[ATTACK - 1](dell, image_infos)
 
+
 def setup_gpio(number, direction, edge=EDGE_NONE, verbose=False):
     try:
         if verbose:
@@ -72,23 +75,21 @@ def setup_gpio(number, direction, edge=EDGE_NONE, verbose=False):
     except:
         raise
 
+
 def handle_button(fp, last, count, function, *args):
     fp.seek(0)
     level = int(fp.read()[0])
     delay = time() - last
     last = time()
-    #print(delay)
     if delay < 0.01:
         return last, count
     count += 1
     # New code
-    #print(*args)
     function(*args)
     return last, count
     # Old code
     if count % 2 == 0:
         if level == 1:
-            #print(*args)
             function(*args)
         else:
             count -= 1
@@ -131,7 +132,6 @@ while True:
                 break
         if i == 0:
             number = ((count[n]) % 6) + 1
-            #number = ((count[n] >> 1) % 3) + 1
             delay = 0.1
             ATTACK = number
             launch = False
@@ -140,7 +140,7 @@ while True:
             delay = 0.02
             launch = True
         print "pass"
-        last[n], count[n] = handle_button(fp[n], last[n], count[n], blink_led, number, delay, launch)
+        last[n], count[n] = handle_button(
+            fp[n], last[n], count[n], blink_led, number, delay, launch)
         if launch:
             count = [0, 0]
-

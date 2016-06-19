@@ -10,6 +10,8 @@ class X86Payload:
         filename = os.path.join(PAYLOAD_PATH, filename)
         with open(filename, "r") as f:
             magic = f.read(8)
+            # all our payloads use pusha
+            # i dont like it but whatever...
             assert magic == "\x01\x03\x10\x10\x20\x00\x00\x00"
             header = f.read(24)
             length = struct.unpack("<H", header[0:2])[0]
