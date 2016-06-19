@@ -8,7 +8,7 @@ a detailed description of our research findings and process.
 Presentation @ http://www.redballoonsecurity.com/presentations/Recon_0xA_A_Monitor_Darkly.pdf
 
 Installing
-----------
+-----------
 
 Right now, the demo has only been tested on Linux. It is known not to work on
 OSX because of problems with pyusb. Ubuntu, Arch, and Fedora are known to work.
