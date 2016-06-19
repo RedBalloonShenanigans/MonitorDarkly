@@ -1,0 +1,97 @@
+This repo contains the exploit for the Dell 2410U monitor. It contains utilities for
+communicating with and executing code on the device.
+
+The research presented here was done in order to highlight the lack of security in "modern"
+on-screen-display controllers. Please check out our Recon 0xA presentation (included) for
+a detailed description of our research findings and process.
+
+Presentation @ http://www.redballoonsecurity.com/presentations/Recon_0xA_A_Monitor_Darkly.pdf
+
+Installing
+----------
+
+Right now, the demo has only been tested on Linux. It is known not to work on
+OSX because of problems with pyusb. Ubuntu, Arch, and Fedora are known to work.
+There are a few dependencies needed:
+
+- pyusb
+- imagemagick + wand (python bindings for imagemagick)
+- as86 and ld86 (for assembling the payloads)
+
+At least on Ubuntu, the following should give you all the needed dependencies:
+
+    sudo apt-get install imagemagick python-wand python-usb bin86
+
+Next, you need to assemble the payloads:
+
+    cd payloads/
+    make
+    cd ..
+
+Finally, with the computer plugged into the monitor's USB hub, do:
+
+    sudo ./src/demo.py
+
+Note that demo.py needs root permissions to run. It will first load all the
+images, which takes a few minutes, and then you'll be presented with a prompt to
+choose the exploit you want to run.
+
+In addition to demo.py, src/gpio.py contains a script designed to run on the USB
+Armory which uses buttons connected to the GPIO pins to launch the demos. You
+can create a script to have it run on boot, for example with systemd install
+something like this to /etc/systemd/system/gpio.service:
+
+    [Unit]
+    Description=GPIO handling
+    
+    [Service]
+    ExecStart=/root/src/gpio.py
+    Restart=always
+    
+    [Install]
+    WantedBy=multi-user.target
+
+and then on the commandline:
+
+    systemctl enable gpio.service
+
+To start it at boot.
+
+There are two other demos included. funtenna.py toggles a GPIO pin, which can be
+picked up by an SDR (we found a signal at 15.3 MHz). show_debug_irq.py shows how
+to set up an interrupt that triggers when certain addresses are read/written,
+which is useful for reverse-engineering.
+
+How does it work?
+-----------------
+
+The Dell 2410U monitor has a Genesis (now owned by ST) display controller
+onboard. The exploit sends debug messages to this chip using Genesis's "GProbe"
+protocol over DDC2bi, which lets it write to RAM, read and write display
+registers, execute arbitrary code, reflash the device, etc. DDC2bi is a a part
+of display protocols such as HDMI and DisplayPort which normally lets the
+computer do things like control the monitor's color settings and get the
+resolution of the monitor. As far as we know, GProbe is always enabled via
+DDC2bi on all Genesis display controllers, with no mechanism to disable it or
+limit who can access it.
+
+The exploit sends a special vendor-specific message to a fake USB storage
+device in the monitor's USB hub to send DDC2bi commands to the monitor.
+Theoretically, we could use DDC directly if the computer launching the exploit
+is plugged into the monitor, but USB is more convenient (and dangerous) since
+you just have to plug something into the USB port.
+
+FAQ
+-------
+
+I tried it, and the images show up but they're flashing and moving around or
+they don't show up at all. Why?
+
+Right now, the exploit only works correctly when something is actually being
+displayed to the screen. Otherwise, the monitor's firmware tries to use the OSD
+(on screen display) hardware to display the "no input connected" message, which
+makes strange things happen since we've already programmed the OSD ourselves.
+Also, if the monitor goes into powersave mode (the power button goes yellow),
+then the display is turned off and you won't see anything at all.
+
+
