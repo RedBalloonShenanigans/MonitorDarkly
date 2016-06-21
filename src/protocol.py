@@ -5,6 +5,7 @@ import usb.util
 import time
 import struct
 import traceback
+import config
 
 DDC2BI3_VCP_PREFIX = '\xc2\x00\x00'
 
@@ -125,8 +126,6 @@ class CommandPayload:
         len_str = struct.pack(">B", self._cmd_len)
         return len_str + self._cmd_type + self._cmd_payload
 
-VERBOSE = False
-
 
 class Dell2410:
     """
@@ -144,7 +143,7 @@ class Dell2410:
     scsi_cmd_opcode = "\xcf"
     padding_byte = "\xcc"
 
-    def __init__(self, verbose=VERBOSE):
+    def __init__(self, verbose=config.verbose):
         self.verbose = verbose
         self.dev = None
         self._hook()
