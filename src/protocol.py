@@ -5,6 +5,9 @@ import usb.util
 import time
 import struct
 import traceback
+import config
+import os
+import fcntl
 
 DDC2BI3_VCP_PREFIX = '\xc2\x00\x00'
 
@@ -50,7 +53,7 @@ class USBI2CWritePacket:
     pak_type = '\x01'  # i2c write
 
     def __init__(self, unk_header, dest_addr, payload):
-        self._dest_addr = struct.pack(">B", dest_addr)
+        self._dest_addr = struct.pack(">B", dest_addr << 1)
         self._len_str = struct.pack(">B", len(payload))
         self._unk_header = unk_header
         self._payload = payload
@@ -71,12 +74,126 @@ class USBI2CReadPacket:
     pak_type = '\x02'  # i2c read
 
     def __init__(self, src_addr, pak_bytes):
-        self._src_addr = struct.pack(">B", src_addr)
+        self._src_addr = struct.pack(">B", (src_addr << 1) | 1)
         self._bytes = struct.pack(">B", pak_bytes)
 
     def toBytes(self):
         payload = self.pak_type + self._src_addr + self._bytes + '\xc0\x00'
         return payload
+
+
+class DellI2CUSBDevice:
+    """
+    This class implements the USB-to-i2c protocol used on the Dell 2410 monitor
+    to send DDC commands. This lets you send DDC packets while only connected
+    to the USB hub.
+    """
+    payload_len = 512
+    scsi_cmd_opcode = "\xcf"
+    padding_byte = "\xcc"
+
+    def __init__(self, verbose=config.verbose):
+        self.verbose = verbose
+        self.dev = None
+        self._hook()
+        self._initialize()
+
+    def __del__(self):
+        self._release()
+
+    def _hook(self):
+        try:
+            self.dev = usb.core.find(idVendor=VENDOR_ID, idProduct=PRODUCT_ID)
+        except Exception as e:
+            if self.verbose:
+                traceback.print_exc()
+                print(e)
+            raise Exception("USB error!")
+        if self.dev is None:
+            raise Exception("Could not hook dell monitor, please verify connection!")
+        if self.verbose:
+            print("USB handle:")
+            print(self.dev)
+        # Default kernel driver sometimes hooks it first
+        if self.dev.is_kernel_driver_active(0):
+            self.dev.detach_kernel_driver(0)
+
+    def _initialize(self):
+        ready_cmd = '\x0f\xff'
+        pad_len = self.payload_len - len(ready_cmd)
+        is_ready_cmd = ready_cmd + self.padding_byte * pad_len
+        # Send the ready1 command
+        # This should return 0400*511
+        val = self._do_cmd(is_ready_cmd)
+        time.sleep(0.03)
+
+    def _release(self):
+        if self.dev is None:
+            return
+        import time
+        time.sleep(2)
+        try:
+            usb.util.dispose_resources(self.dev)
+        except Exception:
+            pass
+
+    def _do_cmd(self, cmd_bytes):
+        if self.verbose:
+            print binascii.hexlify(cmd_bytes)
+
+        payload_padd = self.payload_len - len(cmd_bytes)
+        cmd_bytes = cmd_bytes + payload_padd * self.padding_byte
+
+        # magic cmd block to send i2c request
+        cb_send_i2c = self.scsi_cmd_opcode + "\x20" + '\x00' * 14
+        cmd_send_i2c = CommandBlock(12, self.payload_len, 0x00, 0, cb_send_i2c)
+
+        # magic cmd block to receive i2c response
+        cb_recv_i2c = self.scsi_cmd_opcode + "\x21" + '\x00' * 14
+        cmd_recv_i2c = CommandBlock(12, self.payload_len, 0x80, 0, cb_recv_i2c)
+
+        # Timeout values should be at least 5000ms
+        self.dev.write(0x2, cmd_send_i2c.ret_bin(), 5000)
+        self.dev.write(0x2, cmd_bytes, 5000)
+        usb_resp = self.dev.read(0x82, self.payload_len, 5000)
+
+        self.dev.write(0x2, cmd_recv_i2c.ret_bin())
+        i2c_data = self.dev.read(0x82, self.payload_len, 5000)
+        usb_resp_2 = self.dev.read(0x82, self.payload_len, 5000)
+
+        return i2c_data
+
+    def i2c_write(self, cmd_bytes, address, unk_header):
+        data = USBI2CWritePacket(unk_header,
+                                 address,
+                                 cmd_bytes).toBytes()
+        self._do_cmd(data)
+
+    def i2c_read(self, addr, num_bytes):
+        packet = USBI2CReadPacket(addr, num_bytes)
+        i2c_data = self._do_cmd(packet.toBytes())
+        # the first two bytes of the response seems to be USB header
+        return i2c_data[2:2 + num_bytes]
+
+class I2CDevice:
+    """
+    Wraps a normal I2C device exposed by the kernel.
+    """
+
+    I2C_SLAVE = 0x0703 # ioctl value from i2c-dev.h
+
+    def __init__(self, dev=config.i2c_device):
+        path = "/dev/i2c-%d" % dev
+        print path
+        self._fd = os.open("/dev/i2c-%d" % dev, os.O_RDWR, 0)
+
+    def i2c_write(self, cmd_bytes, address, unk_header):
+        fcntl.ioctl(self._fd, self.I2C_SLAVE, address)
+        os.write(self._fd, cmd_bytes)
+
+    def i2c_read(self, address, num_bytes):
+        fcntl.ioctl(self._fd, self.I2C_SLAVE, address)
+        return [ord(char) for char in os.read(self._fd, num_bytes)]
 
 
 class CommandPacket:
@@ -125,8 +242,6 @@ class CommandPayload:
         len_str = struct.pack(">B", self._cmd_len)
         return len_str + self._cmd_type + self._cmd_payload
 
-VERBOSE = False
-
 
 class Dell2410:
     """
@@ -140,112 +255,44 @@ class Dell2410:
         print dev.reg_read(0xc800)
         dev.debug_off() # returns control to the firmware, so that e.g. buttons work
     """
-    payload_len = 512
-    scsi_cmd_opcode = "\xcf"
-    padding_byte = "\xcc"
 
-    def __init__(self, verbose=VERBOSE):
+    def __init__(self, verbose=config.verbose, device=None):
         self.verbose = verbose
-        self.dev = None
-        self._hook()
-
-    def __del__(self):
-        self._release()
-
-    def _hook(self):
-        try:
-            self.dev = usb.core.find(idVendor=VENDOR_ID, idProduct=PRODUCT_ID)
-        except Exception as e:
-            if self.verbose:
-                traceback.print_exc()
-                print(e)
-            raise Exception("USB error!")
-        if self.dev is None:
-            raise Exception("Could not hook dell monitor, please verify connection!")
-        if self.verbose:
-            print("USB handle:")
-            print(self.dev)
-        # Default kernel driver sometimes hooks it first
-        if self.dev.is_kernel_driver_active(0):
-            self.dev.detach_kernel_driver(0)
-
-    def _release(self):
-        if self.dev is None:
-            return
-        import time
-        time.sleep(2)
-        try:
-            usb.util.dispose_resources(self.dev)
-        except Exception:
-            pass
+        if device:
+            self.dev = device
+        else:
+            if config.method == "usb":
+                self.dev = DellI2CUSBDevice(verbose)
+            else:
+                self.dev = I2CDevice()
 
     def _parse_response(self, resp):
         print("\n\t%s\n" % (binascii.hexlify(resp)))
-        r_code = resp[0]
-        src_addr = resp[2]
-        packet_len = resp[3] - 0x80
-        vcp_content = resp[4:4 + packet_len]
+        src_addr = resp[0]
+        packet_len = resp[1] - 0x80
+        vcp_content = resp[2:2 + packet_len]
         vcp_meat = vcp_content[3:]
         vcp_content_str = binascii.hexlify(vcp_meat)
-        chksum = resp[4 + packet_len]
-        print("\t[%02x] FRM: [%02x] LEN: [%02x] [%s] CHKSUM: [%02x]" % (
-            r_code, src_addr, packet_len, vcp_content_str, chksum))
-
-    def _print_response(self, resp):
-        print("resp1: " + binascii.hexlify(resp[0]))
-        self._parse_response(resp[1])
-        print("resp3: " + binascii.hexlify(resp[2]))
-
-    def _do_cmd(self, cmd_bytes):
-        if self.verbose:
-            print binascii.hexlify(cmd_bytes)
-
-        payload_padd = self.payload_len - len(cmd_bytes)
-        cmd_bytes = cmd_bytes + payload_padd * self.padding_byte
-
-        # magic cmd block to send i2c request
-        cb_send_i2c = self.scsi_cmd_opcode + "\x20" + '\x00' * 14
-        cmd_send_i2c = CommandBlock(12, self.payload_len, 0x00, 0, cb_send_i2c)
-
-        # magic cmd block to receive i2c response
-        cb_recv_i2c = self.scsi_cmd_opcode + "\x21" + '\x00' * 14
-        cmd_recv_i2c = CommandBlock(12, self.payload_len, 0x80, 0, cb_recv_i2c)
-
-        # Timeout values should be at least 5000ms
-        self.dev.write(0x2, cmd_send_i2c.ret_bin(), 5000)
-        self.dev.write(0x2, cmd_bytes, 5000)
-        usb_resp = self.dev.read(0x82, self.payload_len, 5000)
-
-        self.dev.write(0x2, cmd_recv_i2c.ret_bin())
-        i2c_data = self.dev.read(0x82, self.payload_len, 5000)
-        usb_resp_2 = self.dev.read(0x82, self.payload_len, 5000)
-
-        resp = (usb_resp, i2c_data, usb_resp_2)
-
-        if self.verbose:
-            self._print_response(resp)
-
-        return i2c_data
+        chksum = resp[2 + packet_len]
+        print("\tFRM: [%02x] LEN: [%02x] [%s] CHKSUM: [%02x]" % (
+            src_addr, packet_len, vcp_content_str, chksum))
 
     def _i2c_write(self, cmd_bytes, address, unk_header):
-        data = USBI2CWritePacket(unk_header,
-                                 address,
-                                 cmd_bytes).toBytes()
-        self._do_cmd(data)
+        self.dev.i2c_write(cmd_bytes, address, unk_header)
 
     def _i2c_read(self, addr, num_bytes):
-        packet = USBI2CReadPacket(addr, num_bytes)
-        i2c_data = self._do_cmd(packet.toBytes())
-        # the first two bytes of the response seems to be USB header
-        return i2c_data[2:2 + num_bytes]
+        data = self.dev.i2c_read(addr, num_bytes)
+        if self.verbose:
+            self._parse_response(data)
+        return data
 
     def _send_ddc_cmd(self, unk_header, payload, *args):
         packet = CommandPacket(payload, *args)
-        self._i2c_write(packet.toBytes(), 0x6e, unk_header)
+        self._i2c_write(packet.toBytes(), 0x37, unk_header)
 
     def _recv_ddc_resp(self, bytes):
         # 3 bytes for source + length + checksum
-        resp = self._i2c_read(0x6f, bytes + 3)
+        resp = self._i2c_read(0x37, bytes + 3)
         # strip off source + length + checksum
         # TODO verify checksum
         length = resp[1] & 0x7f
@@ -262,15 +309,6 @@ class Dell2410:
         return bytes[3:]
 
     def initialize(self):
-        ready_cmd = '\x0f\xff'
-        pad_len = self.payload_len - len(ready_cmd)
-        is_ready_cmd = ready_cmd + self.padding_byte * pad_len
-        # Send the ready1 command
-        # This should return 0400*511
-        val = self._do_cmd(is_ready_cmd)
-        if self.verbose:
-            self._print_response(val)
-        time.sleep(0.03)
         # Send the ready2 command
         # This should return 0400*511
         self._send_ddc_cmd('\xb4', '\x6e\x0e', '\x6e\x0e\x03')
