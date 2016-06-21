@@ -28,9 +28,22 @@ Next, you need to assemble the payloads:
     make
     cd ..
 
-Finally, with the computer plugged into the monitor's USB hub, do:
+Finally, do:
 
     sudo ./src/demo.py
+
+By default, this uses the USB attack method, which requires the computer to be
+plugged into the monitor's USB hub. To use the i2c method, which only works on
+Linux and requires the computer to be displaying to the monitor, create a
+config.ini file in this directory that looks like:
+
+    [device]
+    method = i2c
+    i2c_device = 2
+
+To determine which i2c device number you need, download and compile ddctool and
+then run it as root. Once you get it working, it should be much faster than the
+USB method. To go back to the USB method, change the method from "i2c" to "usb".
 
 Note that demo.py needs root permissions to run. It will first load all the
 images, which takes a few minutes, and then you'll be presented with a prompt to
@@ -68,18 +81,18 @@ How does it work?
 The Dell 2410U monitor has a Genesis (now owned by ST) display controller
 onboard. The exploit sends debug messages to this chip using Genesis's "GProbe"
 protocol over DDC2bi, which lets it write to RAM, read and write display
-registers, execute arbitrary code, reflash the device, etc. DDC2bi is a a part
+registers, execute arbitrary code, reflash the device, etc. DDC2bi is a part
 of display protocols such as HDMI and DisplayPort which normally lets the
 computer do things like control the monitor's color settings and get the
 resolution of the monitor. As far as we know, GProbe is always enabled via
 DDC2bi on all Genesis display controllers, with no mechanism to disable it or
 limit who can access it.
 
-The exploit sends a special vendor-specific message to a fake USB storage
-device in the monitor's USB hub to send DDC2bi commands to the monitor.
-Theoretically, we could use DDC directly if the computer launching the exploit
-is plugged into the monitor, but USB is more convenient (and dangerous) since
-you just have to plug something into the USB port.
+In USB mode, the exploit sends a special vendor-specific message to a fake USB
+storage device in the monitor's USB hub to send DDC2bi commands to the monitor.
+This is the original method used by the firmware update tool, and if you crash
+the monitor you won't lose your computer's display, but it's a lot slower than
+sending DDC commands directly.
 
 FAQ
 -------

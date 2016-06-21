@@ -6,6 +6,8 @@ import time
 import struct
 import traceback
 import config
+import os
+import fcntl
 
 DDC2BI3_VCP_PREFIX = '\xc2\x00\x00'
 
@@ -173,6 +175,26 @@ class DellI2CUSBDevice:
         # the first two bytes of the response seems to be USB header
         return i2c_data[2:2 + num_bytes]
 
+class I2CDevice:
+    """
+    Wraps a normal I2C device exposed by the kernel.
+    """
+
+    I2C_SLAVE = 0x0703 # ioctl value from i2c-dev.h
+
+    def __init__(self, dev=config.i2c_device):
+        path = "/dev/i2c-%d" % dev
+        print path
+        self._fd = os.open("/dev/i2c-%d" % dev, os.O_RDWR, 0)
+
+    def i2c_write(self, cmd_bytes, address, unk_header):
+        fcntl.ioctl(self._fd, self.I2C_SLAVE, address)
+        os.write(self._fd, cmd_bytes)
+
+    def i2c_read(self, address, num_bytes):
+        fcntl.ioctl(self._fd, self.I2C_SLAVE, address)
+        return [ord(char) for char in os.read(self._fd, num_bytes)]
+
 
 class CommandPacket:
     """
@@ -234,12 +256,15 @@ class Dell2410:
         dev.debug_off() # returns control to the firmware, so that e.g. buttons work
     """
 
-    def __init__(self, device=None, verbose=config.verbose):
+    def __init__(self, verbose=config.verbose, device=None):
         self.verbose = verbose
         if device:
             self.dev = device
         else:
-            self.dev = DellI2CUSBDevice(verbose)
+            if config.method == "usb":
+                self.dev = DellI2CUSBDevice(verbose)
+            else:
+                self.dev = I2CDevice()
 
     def _parse_response(self, resp):
         print("\n\t%s\n" % (binascii.hexlify(resp)))
