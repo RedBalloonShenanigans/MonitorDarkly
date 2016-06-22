@@ -186,6 +186,9 @@ class I2CDevice:
         path = "/dev/i2c-%d" % dev
         self._fd = os.open("/dev/i2c-%d" % dev, os.O_RDWR, 0)
 
+    def __del__(self):
+        os.close(self._fd)
+
     def i2c_write(self, cmd_bytes, address, unk_header):
         fcntl.ioctl(self._fd, self.I2C_SLAVE, address)
         os.write(self._fd, cmd_bytes)
