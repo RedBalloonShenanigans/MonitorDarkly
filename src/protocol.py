@@ -269,17 +269,20 @@ class Dell2410:
                 self.dev = I2CDevice()
 
     def _parse_response(self, resp):
-        print("\n\t%s\n" % (binascii.hexlify(resp)))
+        print("\n\t%s\n" % (binascii.hexlify("".join(chr(byte) for byte in resp))))
         src_addr = resp[0]
         packet_len = resp[1] - 0x80
         vcp_content = resp[2:2 + packet_len]
         vcp_meat = vcp_content[3:]
-        vcp_content_str = binascii.hexlify(vcp_meat)
+        vcp_content_str = binascii.hexlify("".join(chr(byte) for byte in vcp_meat))
         chksum = resp[2 + packet_len]
         print("\tFRM: [%02x] LEN: [%02x] [%s] CHKSUM: [%02x]" % (
             src_addr, packet_len, vcp_content_str, chksum))
 
     def _i2c_write(self, cmd_bytes, address, unk_header):
+        if self.verbose:
+            print("sending: ")
+            print(binascii.hexlify(cmd_bytes))
         self.dev.i2c_write(cmd_bytes, address, unk_header)
 
     def _i2c_read(self, addr, num_bytes):
