@@ -184,7 +184,6 @@ class I2CDevice:
 
     def __init__(self, dev=config.i2c_device):
         path = "/dev/i2c-%d" % dev
-        print path
         self._fd = os.open("/dev/i2c-%d" % dev, os.O_RDWR, 0)
 
     def i2c_write(self, cmd_bytes, address, unk_header):
