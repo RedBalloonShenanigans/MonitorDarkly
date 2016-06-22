@@ -347,8 +347,14 @@ class Dell2410:
     def ram_write(self, address, byte):
         if len(byte) > 120:
             raise Exception('Not allowed to write more than 120 bytes: %d' % len(byte))
-        self._send_gprobe_cmd('\x1a', '\x13', struct.pack(">H", address) + byte)
-        self._recv_gprobe_resp()
+        # loop until we get an ack, since the kernel seems to choke on large
+        # i2c writes sometimes
+        while True:
+            self._send_gprobe_cmd('\x1a', '\x13', struct.pack(">H", address) + byte)
+            resp = self._recv_gprobe_resp()
+            if resp[1] == 0xc: # 0xc is ACK
+                break
+            assert resp[1] == 0xb # 0xb is NAK
 
     def flash_read(self, address, byte_count):
         self._send_gprobe_cmd('\x00', '\x1b', struct.pack(">H", address) +
