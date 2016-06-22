@@ -352,6 +352,7 @@ class Dell2410:
         # i2c writes sometimes
         while True:
             self._send_gprobe_cmd('\x1a', '\x13', struct.pack(">H", address) + byte)
+            time.sleep(0.01)
             resp = self._recv_gprobe_resp()
             if resp[1] == 0xc: # 0xc is ACK
                 break
