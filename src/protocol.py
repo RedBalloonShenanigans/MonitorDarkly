@@ -184,8 +184,10 @@ class I2CDevice:
 
     def __init__(self, dev=config.i2c_device):
         path = "/dev/i2c-%d" % dev
-        print path
         self._fd = os.open("/dev/i2c-%d" % dev, os.O_RDWR, 0)
+
+    def __del__(self):
+        os.close(self._fd)
 
     def i2c_write(self, cmd_bytes, address, unk_header):
         fcntl.ioctl(self._fd, self.I2C_SLAVE, address)
@@ -267,17 +269,20 @@ class Dell2410:
                 self.dev = I2CDevice()
 
     def _parse_response(self, resp):
-        print("\n\t%s\n" % (binascii.hexlify(resp)))
+        print("\n\t%s\n" % (binascii.hexlify("".join(chr(byte) for byte in resp))))
         src_addr = resp[0]
         packet_len = resp[1] - 0x80
         vcp_content = resp[2:2 + packet_len]
         vcp_meat = vcp_content[3:]
-        vcp_content_str = binascii.hexlify(vcp_meat)
+        vcp_content_str = binascii.hexlify("".join(chr(byte) for byte in vcp_meat))
         chksum = resp[2 + packet_len]
         print("\tFRM: [%02x] LEN: [%02x] [%s] CHKSUM: [%02x]" % (
             src_addr, packet_len, vcp_content_str, chksum))
 
     def _i2c_write(self, cmd_bytes, address, unk_header):
+        if self.verbose:
+            print("sending: ")
+            print(binascii.hexlify(cmd_bytes))
         self.dev.i2c_write(cmd_bytes, address, unk_header)
 
     def _i2c_read(self, addr, num_bytes):
@@ -331,6 +336,7 @@ class Dell2410:
 
     def debug_on(self):
         self._send_gprobe_cmd('\xf9', '\x09', '')
+        time.sleep(0.03)
 
     def debug_off(self):
         self._send_gprobe_cmd('\xf9', '\x0a', '')
@@ -342,8 +348,14 @@ class Dell2410:
     def ram_write(self, address, byte):
         if len(byte) > 120:
             raise Exception('Not allowed to write more than 120 bytes: %d' % len(byte))
-        self._send_gprobe_cmd('\x1a', '\x13', struct.pack(">H", address) + byte)
-        self._recv_gprobe_resp()
+        # loop until we get an ack, since the kernel seems to choke on large
+        # i2c writes sometimes
+        while True:
+            self._send_gprobe_cmd('\x1a', '\x13', struct.pack(">H", address) + byte)
+            resp = self._recv_gprobe_resp()
+            if resp[1] == 0xc: # 0xc is ACK
+                break
+            assert resp[1] == 0xb # 0xb is NAK
 
     def flash_read(self, address, byte_count):
         self._send_gprobe_cmd('\x00', '\x1b', struct.pack(">H", address) +
