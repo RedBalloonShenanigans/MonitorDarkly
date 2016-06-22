@@ -336,6 +336,7 @@ class Dell2410:
 
     def debug_on(self):
         self._send_gprobe_cmd('\xf9', '\x09', '')
+        time.sleep(0.03)
 
     def debug_off(self):
         self._send_gprobe_cmd('\xf9', '\x0a', '')
