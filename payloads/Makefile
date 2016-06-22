@@ -1,11 +1,4 @@
-PAYLOADS=grab_pixel \
-	 memcpy \
-	 sdram_read \
-	 sdram_write \
-	 transfer_clut \
-	 exfil \
-	 funtenna \
-	 show_debug_irq \
+PAYLOADS=$(patsubst %.s,%,$(wildcard *.s))
 
 all: $(PAYLOADS)
 
@@ -18,5 +11,5 @@ $(PAYLOADS): %: %.o
 clean:
 	rm -f $(PAYLOADS) *.o
 
-.PHONY: all
+.PHONY: all clean
 
