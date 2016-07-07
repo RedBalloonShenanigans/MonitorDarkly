@@ -364,6 +364,7 @@ class Dell2410:
 
     def reg_read(self, address):
         self._send_gprobe_cmd('\x0a', '\x06', struct.pack(">H", address))
+        time.sleep(0.01)
         resp = self._recv_gprobe_resp(6)
         return struct.pack('<BB', resp[5], resp[4])
 
