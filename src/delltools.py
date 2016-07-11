@@ -49,7 +49,7 @@ def mem_read(dev, start, l=0x2000):
 
 def execute_payload(dev, payload, ram_addr=0x6000):
     mem_write(dev, ram_addr, payload.data)
-    dev.execute(ram_addr)
+    dev.execute_2(ram_addr)
 
 
 def clear_0xc000(dev):

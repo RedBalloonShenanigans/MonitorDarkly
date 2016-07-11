@@ -406,4 +406,8 @@ class Dell2410:
         resp = self._recv_gprobe_resp(size + 2)
         return ''.join(chr(byte) for byte in resp[2:2 + size])
 
+    def execute_2(self, address):
+        self._send_gprobe_cmd('\x00', '\x54', self._pack_flat_address(address))
+        self._recv_gprobe_resp()
+
 
