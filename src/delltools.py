@@ -9,7 +9,7 @@ VERBOSE = False
 
 
 FREE_REG_ADDR_START = 0x3a5a
-FREE_REG_ADDR_END = 0x3a5a
+FREE_REG_ADDR_END = 0x3a60
 
 SRAM_CMD_MEM_START = 0xc000
 SRAM_CMD_MEM_END = 0xc800
@@ -37,7 +37,7 @@ def mem_read(dev, start, l=0x2000):
             new.replace_word(0xacac, i)
             execute_payload(dev, new, 0x500)
             time.sleep(0.03)
-            for i in range(FREE_REG_ADDR_END, FREE_REG_ADDR_END, 2):
+            for i in range(FREE_REG_ADDR_START, FREE_REG_ADDR_END, 2):
                 extracted_mem += dev.reg_read(i)
                 time.sleep(0.03)
     except Exception as e:
