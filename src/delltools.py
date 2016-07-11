@@ -85,13 +85,9 @@ def upload_single_image(dev, image, upload_address):
     width = int(image.width / 2)
     stride = int(image.width / 2)
     height = image.height
-    for i in range(0, len(bitmap_image), 8000):
-        mem_write(dev, 0x4000, bitmap_image[i:i + 8000])
-        addr_hi = addr >> 8
-        addr_lo = addr & 0xff
-        memcpy(dev, addr_hi, 0x0, addr_lo, 0x4000, 8000)
-        addr += 8000
-        print '*:' * 10, i, addr
+    mem_write(dev, addr, image.image)
+    addr += len(image.image)
+    print "uploaded image at %s, size %s" % (hex(upload_address), hex(len(image.image)))
     return (width, height, stride, upload_address, clut_table), addr
 
 
