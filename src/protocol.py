@@ -396,7 +396,7 @@ class Dell2410:
 
     def ram_write_2(self, address, data):
         assert len(data) <= 120
-        self._send_gprobe_cmd('\x00', '\x53', self._pack_flat_address(address) + data)
+        self._send_gprobe_cmd('\x1a', '\x53', self._pack_flat_address(address) + data)
 
     def ram_read_2(self, address, size):
         assert size <= 127
@@ -405,5 +405,9 @@ class Dell2410:
         time.sleep(0.01)
         resp = self._recv_gprobe_resp(size + 2)
         return ''.join(chr(byte) for byte in resp[2:2 + size])
+
+    def execute_2(self, address):
+        self._send_gprobe_cmd('\x62', '\x54', self._pack_flat_address(address))
+        self._recv_gprobe_resp()
 
 

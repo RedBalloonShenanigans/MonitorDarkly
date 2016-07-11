@@ -16,36 +16,40 @@ SRAM_CMD_MEM_END = 0xc800
 SEGMENT_MAX_LIMIT = 2 ** 16
 
 
-def bulk_write_data(dev, addr, data):
-    off_s = range(0, len(data), 100)
-    off_e = off_s[1:]
-    off_e.append(len(data))
-    for start, end in zip(off_s, off_e):
-        dev.ram_write(addr + start, data[start:end])
+def mem_write(dev, addr, data):
+    cur = addr
+    mem = ''
+    while cur < addr + len(data):
+        next_ = min(cur + 110, addr + len(data))
+        # see comment in mem_read()
+        if next_ & 0xffff0000 != cur & 0xffff0000:
+            next_ = next_ & 0xffff0000
+        dev.ram_write_2(cur, data[cur - addr:next_ - addr])
+        cur = next_
 
 
 def mem_read(dev, start, l=0x2000):
     cur = start
     mem = ''
     while cur < start + l:
-        next = min(cur + 120, start + l)
+        next_ = min(cur + 120, start + l)
         # the segment + offset in ram_read_2 is computed as:
         # segment = (address & 0xffff0000) >> 8
         # offset = address & 0xffff
         # and if we go far enough that address_lo wraps around, then we'll
         # wrap around and get stuff from the beginning of the segment
-        if next & 0xffff0000 != cur & 0xffff0000:
-            next = next & 0xffff0000
-        mem += dev.ram_read_2(cur, next - cur)
-        cur = next
+        if next_ & 0xffff0000 != cur & 0xffff0000:
+            next_ = next_ & 0xffff0000
+        mem += dev.ram_read_2(cur, next_ - cur)
+        cur = next_
     return mem
 
 
 
 
 def execute_payload(dev, payload, ram_addr=0x6000):
-    bulk_write_data(dev, ram_addr, payload.data)
-    dev.execute(ram_addr)
+    mem_write(dev, ram_addr, payload.data)
+    dev.execute_2(ram_addr)
 
 
 def clear_0xc000(dev):
@@ -64,7 +68,7 @@ def bulk_sdram_write(dev, x, reg_hi, reg_lo=0):
         if i + step > len(x):
             end = len(x) - i
         y = x[i: end]
-        bulk_write_data(dev, free_mem_addr, y)
+        mem_write(dev, free_mem_addr, y)
         sdram_write(dev, src_seg=0x0, src_off=free_mem_addr, reg_hi=reg_hi + j,
                     reg_lo=i + reg_lo, height=1, width=end, stride=end,
                     ram_write_addr=0x670)
@@ -81,13 +85,9 @@ def upload_single_image(dev, image, upload_address):
     width = int(image.width / 2)
     stride = int(image.width / 2)
     height = image.height
-    for i in range(0, len(bitmap_image), 8000):
-        bulk_write_data(dev, 0x4000, bitmap_image[i:i + 8000])
-        addr_hi = addr >> 8
-        addr_lo = addr & 0xff
-        memcpy(dev, addr_hi, 0x0, addr_lo, 0x4000, 8000)
-        addr += 8000
-        print '*:' * 10, i, addr
+    mem_write(dev, addr, image.image)
+    addr += len(image.image)
+    print "uploaded image at %s, size %s" % (hex(upload_address), hex(len(image.image)))
     return (width, height, stride, upload_address, clut_table), addr
 
 
@@ -124,7 +124,7 @@ def put_image(dev, images_metainfo, x=0, y=0):
     control += struct.pack('<H', height)    # height
     control += struct.pack('<H', y)         # y coord
     control += '\x1b\x00'                   # transperency and patterns , 8 bits only
-    bulk_write_data(dev, 0xc078, control)
+    mem_write(dev, 0xc078, control)
 
 
 def sdram_read(dev, dst_off=0, read_off=0, reg_hi=0, reg_lo=0, height=0, width=0,
@@ -184,5 +184,5 @@ def transfer_clut(dev, clut_table, clut_low=0x7000):
     payload = X86Payload("transfer_clut")
     payload.replace_word(0xadad, 0x0000)  # clut_high
     payload.replace_word(0xacac, clut_low)
-    bulk_write_data(dev, clut_low, clut_table)
+    mem_write(dev, clut_low, clut_table)
     execute_payload(dev, payload, 0x600)
