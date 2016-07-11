@@ -9,7 +9,7 @@ VERBOSE = False
 
 
 FREE_REG_ADDR_START = 0x3a5a
-FREE_REG_ADDR_END = 0x3a5a
+FREE_REG_ADDR_END = 0x3a60
 
 SRAM_CMD_MEM_START = 0xc000
 SRAM_CMD_MEM_END = 0xc800
@@ -24,24 +24,23 @@ def bulk_write_data(dev, addr, data):
         dev.ram_write(addr + start, data[start:end])
 
 
-def mem_read(dev, segment=0xf000, start_offset=0, l=0x2000):
-    extracted_mem = ''
-    end_offset = start_offset + l
-    payload = X86Payload("exfil")
-    payload.replace_word(0xadad, segment)
-    try:
-        for i in xrange(start_offset, end_offset, 6):
-            new = copy.deepcopy(payload)
-            new.replace_word(0xacac, i)
-            execute_payload(dev, new, 0x500)
-            time.sleep(0.03)
-            for i in range(FREE_REG_ADDR_END, FREE_REG_ADDR_END, 2):
-                extracted_mem += dev.reg_read(i)
-                time.sleep(0.03)
-    except Exception as e:
-        print str(e)
-    finally:
-        return extracted_mem
+def mem_read(dev, start, l=0x2000):
+    cur = start
+    mem = ''
+    while cur < start + l:
+        next = min(cur + 120, start + l)
+        # the segment + offset in ram_read_2 is computed as:
+        # segment = (address & 0xffff0000) >> 8
+        # offset = address & 0xffff
+        # and if we go far enough that address_lo wraps around, then we'll
+        # wrap around and get stuff from the beginning of the segment
+        if next & 0xffff0000 != cur & 0xffff0000:
+            next = next & 0xffff0000
+        mem += dev.ram_read_2(cur, next - cur)
+        cur = next
+    return mem
+
+
 
 
 def execute_payload(dev, payload, ram_addr=0x6000):
@@ -171,10 +170,7 @@ def grab_pixel(dev, vertical_coord, horizontal_coord, memory_dump_addr=0x4000):
     payload.replace_word(0xbebe, horizontal_coord)
     payload.replace_word(0xcece, memory_dump_addr)
     execute_payload(dev, payload, 0x600)
-    segment_hi = memory_dump_addr >> 16
-    segment_lo = memory_dump_addr & 0xffff
-    extracted_dump_data = mem_read(dev, segment=segment_hi,
-                                   start_offset=segment_lo, l=0x6)
+    extracted_dump_data = mem_read(dev, memory_dump_addr, l=0x6)
 
     color_val = {
         'R': struct.unpack('<H', extracted_dump_data[:2]),

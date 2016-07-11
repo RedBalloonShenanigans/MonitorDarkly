@@ -390,3 +390,20 @@ class Dell2410:
         self._send_gprobe_cmd('\x32', '\x1c', '\xff\x00\x00\x20\x00\x00')
         time.sleep(0.03)
         self._recv_gprobe_resp()
+
+    def _pack_flat_address(self, address):
+        return struct.pack('>H', address >> 16) + struct.pack('>H', address & 0xffff)
+
+    def ram_write_2(self, address, data):
+        assert len(data) <= 120
+        self._send_gprobe_cmd('\x00', '\x53', self._pack_flat_address(address) + data)
+
+    def ram_read_2(self, address, size):
+        assert size <= 127
+        self._send_gprobe_cmd('\x00', '\x52',
+                              self._pack_flat_address(address) + '\x00\x00\x00' + chr(size))
+        time.sleep(0.01)
+        resp = self._recv_gprobe_resp(size + 2)
+        return ''.join(chr(byte) for byte in resp[2:2 + size])
+
+
