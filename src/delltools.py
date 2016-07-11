@@ -24,7 +24,9 @@ def bulk_write_data(dev, addr, data):
         dev.ram_write(addr + start, data[start:end])
 
 
-def mem_read(dev, segment=0xf000, start_offset=0, l=0x2000):
+def mem_read(dev, start, l=0x2000):
+    segment = start >> 8
+    start_offset = start & 0xff
     extracted_mem = ''
     end_offset = start_offset + l
     payload = X86Payload("exfil")
@@ -171,10 +173,7 @@ def grab_pixel(dev, vertical_coord, horizontal_coord, memory_dump_addr=0x4000):
     payload.replace_word(0xbebe, horizontal_coord)
     payload.replace_word(0xcece, memory_dump_addr)
     execute_payload(dev, payload, 0x600)
-    segment_hi = memory_dump_addr >> 16
-    segment_lo = memory_dump_addr & 0xffff
-    extracted_dump_data = mem_read(dev, segment=segment_hi,
-                                   start_offset=segment_lo, l=0x6)
+    extracted_dump_data = mem_read(dev, memory_dump_addr, l=0x6)
 
     color_val = {
         'R': struct.unpack('<H', extracted_dump_data[:2]),
