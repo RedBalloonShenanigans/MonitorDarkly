@@ -16,7 +16,7 @@ SRAM_CMD_MEM_END = 0xc800
 SEGMENT_MAX_LIMIT = 2 ** 16
 
 
-def bulk_write_data(dev, addr, data):
+def mem_write(dev, addr, data):
     cur = addr
     mem = ''
     while cur < addr + len(data):
@@ -48,7 +48,7 @@ def mem_read(dev, start, l=0x2000):
 
 
 def execute_payload(dev, payload, ram_addr=0x6000):
-    bulk_write_data(dev, ram_addr, payload.data)
+    mem_write(dev, ram_addr, payload.data)
     dev.execute(ram_addr)
 
 
@@ -68,7 +68,7 @@ def bulk_sdram_write(dev, x, reg_hi, reg_lo=0):
         if i + step > len(x):
             end = len(x) - i
         y = x[i: end]
-        bulk_write_data(dev, free_mem_addr, y)
+        mem_write(dev, free_mem_addr, y)
         sdram_write(dev, src_seg=0x0, src_off=free_mem_addr, reg_hi=reg_hi + j,
                     reg_lo=i + reg_lo, height=1, width=end, stride=end,
                     ram_write_addr=0x670)
@@ -86,7 +86,7 @@ def upload_single_image(dev, image, upload_address):
     stride = int(image.width / 2)
     height = image.height
     for i in range(0, len(bitmap_image), 8000):
-        bulk_write_data(dev, 0x4000, bitmap_image[i:i + 8000])
+        mem_write(dev, 0x4000, bitmap_image[i:i + 8000])
         addr_hi = addr >> 8
         addr_lo = addr & 0xff
         memcpy(dev, addr_hi, 0x0, addr_lo, 0x4000, 8000)
@@ -128,7 +128,7 @@ def put_image(dev, images_metainfo, x=0, y=0):
     control += struct.pack('<H', height)    # height
     control += struct.pack('<H', y)         # y coord
     control += '\x1b\x00'                   # transperency and patterns , 8 bits only
-    bulk_write_data(dev, 0xc078, control)
+    mem_write(dev, 0xc078, control)
 
 
 def sdram_read(dev, dst_off=0, read_off=0, reg_hi=0, reg_lo=0, height=0, width=0,
@@ -188,5 +188,5 @@ def transfer_clut(dev, clut_table, clut_low=0x7000):
     payload = X86Payload("transfer_clut")
     payload.replace_word(0xadad, 0x0000)  # clut_high
     payload.replace_word(0xacac, clut_low)
-    bulk_write_data(dev, clut_low, clut_table)
+    mem_write(dev, clut_low, clut_table)
     execute_payload(dev, payload, 0x600)
