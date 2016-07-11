@@ -17,11 +17,15 @@ SEGMENT_MAX_LIMIT = 2 ** 16
 
 
 def bulk_write_data(dev, addr, data):
-    off_s = range(0, len(data), 100)
-    off_e = off_s[1:]
-    off_e.append(len(data))
-    for start, end in zip(off_s, off_e):
-        dev.ram_write(addr + start, data[start:end])
+    cur = addr
+    mem = ''
+    while cur < addr + len(data):
+        next = min(cur + 110, addr + len(data))
+        # see comment in mem_read()
+        if next & 0xffff0000 != cur & 0xffff0000:
+            next = next & 0xffff0000
+        dev.ram_write_2(cur, data[cur - addr:next - addr])
+        cur = next
 
 
 def mem_read(dev, start, l=0x2000):
