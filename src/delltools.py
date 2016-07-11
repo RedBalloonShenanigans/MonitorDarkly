@@ -25,25 +25,22 @@ def bulk_write_data(dev, addr, data):
 
 
 def mem_read(dev, start, l=0x2000):
-    segment = start >> 8
-    start_offset = start & 0xff
-    extracted_mem = ''
-    end_offset = start_offset + l
-    payload = X86Payload("exfil")
-    payload.replace_word(0xadad, segment)
-    try:
-        for i in xrange(start_offset, end_offset, 6):
-            new = copy.deepcopy(payload)
-            new.replace_word(0xacac, i)
-            execute_payload(dev, new, 0x500)
-            time.sleep(0.03)
-            for i in range(FREE_REG_ADDR_START, FREE_REG_ADDR_END, 2):
-                extracted_mem += dev.reg_read(i)
-                time.sleep(0.03)
-    except Exception as e:
-        print str(e)
-    finally:
-        return extracted_mem
+    cur = start
+    mem = ''
+    while cur < start + l:
+        next = min(cur + 120, start + l)
+        # the segment + offset in ram_read_2 is computed as:
+        # segment = (address & 0xffff0000) >> 8
+        # offset = address & 0xffff
+        # and if we go far enough that address_lo wraps around, then we'll
+        # wrap around and get stuff from the beginning of the segment
+        if next & 0xffff0000 != cur & 0xffff0000:
+            next = next & 0xffff0000
+        mem += dev.ram_read_2(cur, next - cur)
+        cur = next
+    return mem
+
+
 
 
 def execute_payload(dev, payload, ram_addr=0x6000):
