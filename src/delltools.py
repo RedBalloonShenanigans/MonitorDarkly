@@ -20,28 +20,28 @@ def mem_write(dev, addr, data):
     cur = addr
     mem = ''
     while cur < addr + len(data):
-        next = min(cur + 110, addr + len(data))
+        next_ = min(cur + 110, addr + len(data))
         # see comment in mem_read()
-        if next & 0xffff0000 != cur & 0xffff0000:
-            next = next & 0xffff0000
-        dev.ram_write_2(cur, data[cur - addr:next - addr])
-        cur = next
+        if next_ & 0xffff0000 != cur & 0xffff0000:
+            next_ = next_ & 0xffff0000
+        dev.ram_write_2(cur, data[cur - addr:next_ - addr])
+        cur = next_
 
 
 def mem_read(dev, start, l=0x2000):
     cur = start
     mem = ''
     while cur < start + l:
-        next = min(cur + 120, start + l)
+        next_ = min(cur + 120, start + l)
         # the segment + offset in ram_read_2 is computed as:
         # segment = (address & 0xffff0000) >> 8
         # offset = address & 0xffff
         # and if we go far enough that address_lo wraps around, then we'll
         # wrap around and get stuff from the beginning of the segment
-        if next & 0xffff0000 != cur & 0xffff0000:
-            next = next & 0xffff0000
-        mem += dev.ram_read_2(cur, next - cur)
-        cur = next
+        if next_ & 0xffff0000 != cur & 0xffff0000:
+            next_ = next_ & 0xffff0000
+        mem += dev.ram_read_2(cur, next_ - cur)
+        cur = next_
     return mem
 
 
