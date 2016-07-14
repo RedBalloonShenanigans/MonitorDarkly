@@ -9,9 +9,9 @@ THIS_PATH = os.path.dirname(os.path.realpath(__file__))
 CONFIG_PATH = os.path.join(THIS_PATH, "../config.ini")
 
 _config = ConfigParser.ConfigParser({
-    "verbose": False,
+    "verbose": "False",
     "method": "usb",
-    "i2c_device": 0
+    "i2c_device": "0",
 })
 
 _config.add_section("debug")
