@@ -179,6 +179,21 @@ def grab_pixel(dev, vertical_coord, horizontal_coord, memory_dump_addr=0x4000):
     }
     return color_val
 
+def grab_pixel_imp(dev, vertical_coord, horizontal_coord, memory_dump_addr=0x4000):
+    """grab pixel values using the Input Main Processor"""
+    payload = X86Payload("grab_pixel_imp")
+    payload.replace_word(0xadad, vertical_coord)
+    payload.replace_word(0xacac, horizontal_coord)
+    payload.replace_word(0xaeae, memory_dump_addr)
+    execute_payload(dev, payload, 0x600)
+    extracted_dump_data = mem_read(dev, memory_dump_addr, l=0x6)
+
+    color_val = {
+        'R': struct.unpack('<H', extracted_dump_data[:2])[0],
+        'G': struct.unpack('<H', extracted_dump_data[2:4])[0],
+        'B': struct.unpack('<H', extracted_dump_data[4:6])[0],
+    }
+    return color_val
 
 def transfer_clut(dev, clut_table, clut_low=0x7000):
     payload = X86Payload("transfer_clut")
