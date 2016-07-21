@@ -18,7 +18,6 @@ SEGMENT_MAX_LIMIT = 2 ** 16
 
 def mem_write(dev, addr, data):
     cur = addr
-    mem = ''
     while cur < addr + len(data):
         next_ = min(cur + 110, addr + len(data))
         # see comment in mem_read()
@@ -43,8 +42,6 @@ def mem_read(dev, start, l=0x2000):
         mem += dev.ram_read_2(cur, next_ - cur)
         cur = next_
     return mem
-
-
 
 
 def execute_payload(dev, payload, ram_addr=0x6000):
@@ -127,16 +124,17 @@ def put_image(dev, images_metainfo, x=0, y=0):
     mem_write(dev, 0xc078, control)
 
 
-def sdram_read(dev, dst_off=0, read_off=0, reg_hi=0, reg_lo=0, height=0, width=0,
-               stride=0, ram_write_addr=0x500):
+def sdram_read(dev, dst_seg, dst_off=0, read_off=0, sdram_hi=0, sdram_lo=0, height=0,
+               width=0, stride=0, ram_write_addr=0x500):
     payload = X86Payload("sdram_read")
     payload.replace_word(0xadad, dst_off)
+    payload.replace_word(0xa1a1, dst_seg)
     payload.replace_word(0xacac, read_off)
     payload.replace_word(0xaeae, height)
     payload.replace_word(0xafaf, width)
     payload.replace_word(0xbdbd, stride)
-    payload.replace_word(0xbcbc, reg_hi)
-    payload.replace_word(0xbebe, reg_lo)
+    payload.replace_word(0xbcbc, sdram_hi)
+    payload.replace_word(0xbebe, sdram_lo)
     execute_payload(dev, payload, ram_write_addr)
 
 
@@ -179,6 +177,7 @@ def grab_pixel(dev, vertical_coord, horizontal_coord, memory_dump_addr=0x4000):
     }
     return color_val
 
+
 def grab_pixel_imp(dev, vertical_coord, horizontal_coord, memory_dump_addr=0x4000):
     """grab pixel values using the Input Main Processor"""
     payload = X86Payload("grab_pixel_imp")
@@ -194,6 +193,7 @@ def grab_pixel_imp(dev, vertical_coord, horizontal_coord, memory_dump_addr=0x400
         'B': struct.unpack('<H', extracted_dump_data[4:6])[0],
     }
     return color_val
+
 
 def transfer_clut(dev, clut_table, clut_low=0x7000):
     payload = X86Payload("transfer_clut")

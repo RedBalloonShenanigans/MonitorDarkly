@@ -2,6 +2,7 @@
 export _main
 
 dst_off EQU 0xadad
+dst_seg EQU 0xa1a1
 read_off EQU 0xacac
 height EQU 0xaeae
 width EQU 0xafaf
@@ -15,6 +16,7 @@ _main:
     push si
     push ds
 
+    push #dst_seg ; dst_seg
     push #dst_off ; dst_off
     push #read_off ; dst_off
     push #height ; height
@@ -22,8 +24,8 @@ _main:
     push #stride ; stride
     push #reg_hi ; hi
     push #reg_lo ; lo
-    call $f000:$264
-    add sp, #0xe
+    call $f000:$e1
+    add sp, #0x10
     mov si, ax
     mov ax, #0
     mov ds, ax
