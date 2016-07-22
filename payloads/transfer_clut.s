@@ -3,15 +3,15 @@ export _main
 
 clut_high EQU 0xadad
 clut_low EQU 0xacac
+max_colors EQU 256
 
 _main:
     pusha
 
-    push #0x3c ;15 * 4
-    push #0x100
+    push #max_colors * 4 ;15 * 4
+    push #0x0
     push #clut_high
     mov ax, #clut_low
-    sub ax, #4
     push ax
     push #0
     push #1

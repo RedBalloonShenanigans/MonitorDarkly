@@ -77,15 +77,14 @@ def bulk_sdram_write(dev, x, reg_hi, reg_lo=0):
 
 
 def upload_single_image(dev, image, upload_address):
-    bitmap_image, clut_table = image.image, image.table
     addr = upload_address
-    width = int(image.width / 2)
-    stride = int(image.width / 2)
+    width = image.width
+    stride = image.width
     height = image.height
     mem_write(dev, addr, image.image)
     addr += len(image.image)
     print "uploaded image at %s, size %s" % (hex(upload_address), hex(len(image.image)))
-    return (width, height, stride, upload_address, clut_table), addr
+    return (width, height, stride, upload_address, image.table), addr
 
 
 def all_images_upload(dev, images, start_address=0x600000):
@@ -112,15 +111,19 @@ def put_image(dev, images_metainfo, x=0, y=0):
                 stride=stride, ram_write_addr=0x600)
 
     transfer_clut(dev, clut_table)
-    control = '\x00' * 24                   # [:24]
-    control += '\x04\x04'                   # color
-    control += struct.pack('<H', x)         # x coord
-    control += struct.pack('<H', width)     # width
-    control += struct.pack('<H', width)     # expansion level!?
-    control += '\x00\x00'                   # sdram location
-    control += struct.pack('<H', height)    # height
-    control += struct.pack('<H', y)         # y coord
-    control += '\x1b\x00'                   # transperency and patterns , 8 bits only
+    control = '\x00' * 24                           # [:24]
+    control += '\x04\x04'                           # color
+    control += struct.pack('<H', x)                 # x coord
+    control += struct.pack('<H', int(width) / 2)    # width
+    control += struct.pack('<H', int(width) / 2)    # stride
+    control += '\x00\x00'                           # sdram location
+    control += struct.pack('<H', height)            # height
+    control += struct.pack('<H', y)                 # y coord
+    # lower 3 bits at 0x27 offset of the control structure sets up the
+    # bit per pixel mode for the monitor
+    # 011 : 4 bpp
+    # 100 : 8 bpp
+    control += '\x14\x00'          # transperency and patterns
     mem_write(dev, 0xc078, control)
 
 

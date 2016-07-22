@@ -354,9 +354,12 @@ class Dell2410:
             self._send_gprobe_cmd('\x1a', '\x13', struct.pack(">H", address) + byte)
             time.sleep(0.01)
             resp = self._recv_gprobe_resp()
-            if resp[1] == 0xc: # 0xc is ACK
-                break
-            assert resp[1] == 0xb # 0xb is NAK
+            try:
+                if resp[1] == 0xc: # 0xc is ACK
+                    break
+                assert resp[1] == 0xb # 0xb is NAK
+            except:
+                print "Response was nether ack nor NAK: %s" % str(resp)
 
     def flash_read(self, address, byte_count):
         self._send_gprobe_cmd('\x00', '\x1b', struct.pack(">H", address) +

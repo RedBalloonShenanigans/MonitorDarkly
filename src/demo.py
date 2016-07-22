@@ -3,11 +3,12 @@ import protocol
 import delltools
 from image import DellImage
 
+
 def upload_demo_images(dev):
-    red_image = DellImage('red.pcx', transparency=0x0e)
-    lock_image = DellImage('lock_pink.gif', transparency=0x0e)
-    shak_image = DellImage('shak.gif', transparency=None)
-    unicorn_image = DellImage('UnicornFartsCrop.pcx', transparency=None)
+    red_image = DellImage('red.gif')
+    lock_image = DellImage('lock_pink.gif')
+    shak_image = DellImage('shak_crop.gif')
+    unicorn_image = DellImage('unicornFarts.gif')
     images = [red_image, lock_image, shak_image, unicorn_image]
     images_metainfo = delltools.all_images_upload(dev, images)
     return {
@@ -41,6 +42,7 @@ def put_unicorn(dev, images):
     unicorn_image_info = images['unicorn']
     delltools.put_image(dev, unicorn_image_info, unicorn_coordinates[0], unicorn_coordinates[1])
 
+
 def no_image(dev, images):
     delltools.clear_0xc000(dev)
 
@@ -57,7 +59,8 @@ if __name__ == "__main__":
     }
     image_infos = upload_demo_images(dell)
     while True:
-        attack = raw_input('Enter a Attack Name:\t\n 1. Unicorn\n 2. Lock\n 3. Shak\n 4. HMI\n 5. Clear\n 6. Quit\n')
+        attack = raw_input(
+            'Enter a Attack Name:\t\n 1. Unicorn\n 2. Lock\n 3. Shak\n 4. HMI\n 5. Clear\n 6. Quit\n')
         if attack.rstrip(' ') == '6':
             break
         else:
