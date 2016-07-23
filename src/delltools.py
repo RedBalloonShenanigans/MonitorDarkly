@@ -54,28 +54,6 @@ def clear_0xc000(dev):
         dev.ram_write(i, '\x00' * 100)
 
 
-def bulk_sdram_write(dev, x, reg_hi, reg_lo=0):
-    step = 0x1000
-    i = 0
-    j = 0
-    k = 0
-    free_mem_addr = 0x4000
-    while k < len(x):
-        end = step
-        if i + step > len(x):
-            end = len(x) - i
-        y = x[i: end]
-        mem_write(dev, free_mem_addr, y)
-        sdram_write(dev, src_seg=0x0, src_off=free_mem_addr, reg_hi=reg_hi + j,
-                    reg_lo=i + reg_lo, height=1, width=end, stride=end,
-                    ram_write_addr=0x670)
-        i += end
-        k += end
-        if i == SEGMENT_MAX_LIMIT:
-            j += 1
-            i = 0
-
-
 def upload_single_image(dev, image, upload_address):
     addr = upload_address
     width = image.width
@@ -103,12 +81,10 @@ def put_image(dev, images_metainfo, x=0, y=0):
     height = images_metainfo[1]
     stride = images_metainfo[2]
     upload_address = images_metainfo[3]
-    upload_address_hi = upload_address >> 8
-    upload_address_lo = upload_address & 0xff
     clear_0xc000(dev)
-    sdram_write(dev, src_seg=upload_address_hi, src_off=upload_address_lo,
-                reg_hi=0, reg_lo=0, height=height, width=width,
-                stride=stride, ram_write_addr=0x600)
+    sdram_write(dev, src=upload_address,
+                dest=0, height=height, width=width,
+                dest_stride=stride)
 
     transfer_clut(dev, clut_table)
     control = '\x00' * 24                           # [:24]
@@ -126,9 +102,28 @@ def put_image(dev, images_metainfo, x=0, y=0):
     control += '\x14\x00'          # transperency and patterns
     mem_write(dev, 0xc078, control)
 
+def sdram_read(dev, src, dest, height, width, src_stride):
+    # The IROM sdram_read function has a similar bug to sdram_write, where the
+    # offset can't be >64k, so we need a similar fix.
+    assert width < 0x10000
+    while height > 0:
+        sdram_lo = src & 0xffff
+        sdram_hi = src >> 16
+        dest_off = dest & 0xff
+        dest_seg = dest >> 8
+        new_height = height
+        while dest_off + new_height * width > 0x10000:
+            new_height -= 1
+        _sdram_read(dev, dest_seg, dest_off, 0, sdram_hi, sdram_lo, new_height,
+                    width, src_stride)
+        src += width * new_height
+        dest += width * new_height
+        height -= new_height
 
-def sdram_read(dev, dst_seg, dst_off=0, read_off=0, sdram_hi=0, sdram_lo=0, height=0,
-               width=0, stride=0, ram_write_addr=0x500):
+
+
+def _sdram_read(dev, dst_seg, dst_off=0, read_off=0, sdram_hi=0, sdram_lo=0, height=0,
+                width=0, stride=0, ram_write_addr=0x500):
     payload = X86Payload("sdram_read")
     payload.replace_word(0xadad, dst_off)
     payload.replace_word(0xa1a1, dst_seg)
@@ -141,8 +136,32 @@ def sdram_read(dev, dst_seg, dst_off=0, read_off=0, sdram_hi=0, sdram_lo=0, heig
     execute_payload(dev, payload, ram_write_addr)
 
 
-def sdram_write(dev, src_seg=0, src_off=0, reg_hi=0, reg_lo=0, height=0, width=0,
-                stride=0, ram_write_addr=0x690):
+def sdram_write(dev, src, dest, height, width, dest_stride):
+    # The IROM sdram_write function has a bug where if the source offset goes
+    # beyond 64k, rather than incrementing the segment register, it wraps
+    # around and starts reading from the beginning of the segment. To fix this,
+    # we need to split up the write. Complicating the matter is the fact that
+    # we can't start a transfer in the middle of a row, so we can only transfer
+    # whole rows at a time. This code deals with both constraints in order to
+    # correctly upload images >64k in size.
+    assert width < 0x10000
+    while height > 0:
+        reg_lo = dest & 0xffff
+        reg_hi = dest >> 16
+        src_off = src & 0xff
+        src_seg = src >> 8
+        new_height = height
+        while src_off + new_height * width > 0x10000:
+            new_height -= 1
+        _sdram_write(dev, src_seg, src_off, reg_hi, reg_lo, new_height, width,
+                    dest_stride)
+        src += width * new_height
+        dest += width * new_height
+        height -= new_height
+
+
+def _sdram_write(dev, src_seg=0, src_off=0, reg_hi=0, reg_lo=0, height=0, width=0,
+                 stride=0, ram_write_addr=0x600):
     payload = X86Payload("sdram_write")
     payload.replace_word(0xacac, src_off)
     payload.replace_word(0xadad, src_seg)
