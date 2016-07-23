@@ -23,19 +23,16 @@ def command(cmd, msg):
 
 
 class DellImage:
-    # max size supported right now.
-    max_image_size = 256000
     max_colors = 256
 
     def __init__(self, filename, raw_data=None):
         self.filename = os.path.join(IMAGE_PATH, filename)
-        self.width, self.height = self._get_image_dimensions(self.filename,
-                                                             self.max_image_size)
+        self.width, self.height = self._get_image_dimensions(self.filename)
         self.raw_data = raw_data or self._convert()
         self.image, self.table = self._generate()
 
     @staticmethod
-    def _get_image_dimensions(filename, max_image_size):
+    def _get_image_dimensions(filename):
         with Image(filename=filename) as img:
             print(img.size)
             width = img.size[0]
@@ -45,11 +42,7 @@ class DellImage:
             if height % 2 != 0:
                 height -= 1
 
-            # this is broken as right now either control structure or
-            # sdram_write is not properly configured.
-            # For the time being we can only display 2**16 bytes.
-            if width <= 0 or height <= 0 or \
-                    (width * height) > max_image_size:
+            if width <= 0 or height <= 0:
                 raise Exception("Invalid image size {0} x {1}".format(width, height))
         return width, height
 

@@ -7,7 +7,7 @@ from image import DellImage
 def upload_demo_images(dev):
     red_image = DellImage('red.gif')
     lock_image = DellImage('lock_pink.gif')
-    shak_image = DellImage('shak_crop.gif')
+    shak_image = DellImage('shak.gif')
     unicorn_image = DellImage('unicornFarts.gif')
     images = [red_image, lock_image, shak_image, unicorn_image]
     images_metainfo = delltools.all_images_upload(dev, images)
