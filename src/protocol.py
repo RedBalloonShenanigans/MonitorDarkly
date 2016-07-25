@@ -405,7 +405,7 @@ class Dell2410:
         assert size <= 127
         self._send_gprobe_cmd('\x00', '\x52',
                               self._pack_flat_address(address) + '\x00\x00\x00' + chr(size))
-        time.sleep(0.01)
+        time.sleep(0.03)
         resp = self._recv_gprobe_resp(size + 2)
         return ''.join(chr(byte) for byte in resp[2:2 + size])
 
