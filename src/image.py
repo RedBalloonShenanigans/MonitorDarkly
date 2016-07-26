@@ -64,4 +64,4 @@ class DellImage:
         for i in range(self.max_colors):
             index = i * 3
             table += palette[index] + chr(0) + palette[index + 2] + palette[index + 1]
-        return self.raw_data, table
+        return self.raw_data[:self.width*self.height], table
