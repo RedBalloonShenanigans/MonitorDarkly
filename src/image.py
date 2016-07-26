@@ -1,6 +1,7 @@
 import os
 import tempfile
 import subprocess
+import struct
 try:
     from wand.image import Image
 except:
@@ -64,4 +65,30 @@ class DellImage:
         for i in range(self.max_colors):
             index = i * 3
             table += palette[index] + chr(0) + palette[index + 2] + palette[index + 1]
-        return self.raw_data, table
+        return self.raw_data[:self.width*self.height], table
+
+def get_control_struct(width, height, x=0, y=0, sdram_loc=0):
+    # note: sdram location is in units of 2^6 bytes
+    control = '\x00' * 24                           # hilight window info
+    control += '\x04'                               # unknown
+    # bits 4-7 are hilight window enable bits
+    # for 4bpp, the bits 0-3 control which LUT gets used
+    # 0 -> offset = 0
+    # 1 -> offset = 1 * 16 * 4
+    # 2 -> offset = 2 * 16 * 4
+    # etc.
+    control += '\x00'
+    control += struct.pack('<H', x / 2)             # x coord
+    control += struct.pack('<H', int(width) / 2)    # width
+    control += struct.pack('<H', int(width) / 2)    # stride
+    control += struct.pack('<H', sdram_loc & 0xffff) # sdram location (low 8 bits)
+    control += struct.pack('<H', height)            # height
+    control += struct.pack('<H', y)                 # y coord
+    # lower 3 bits set up the bit per pixel mode for the monitor
+    # 000 : disabled
+    # 011 : 4 bpp
+    # 100 : 8 bpp
+    # the rest of the bits are unknown flags
+    control += '\x14'
+    control += chr(sdram_loc >> 16)                 # sdram location (high 4 bits)
+    return control

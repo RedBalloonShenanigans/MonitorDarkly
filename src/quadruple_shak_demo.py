@@ -1,7 +1,7 @@
 #!/usr/bin/python2
 import protocol
 import delltools
-from image import DellImage
+from image import DellImage, get_control_struct
 import struct
 
 
@@ -19,15 +19,7 @@ def put_lock_8(dev, images_metainfo, x, y):
 
     for addr in control_pak_addrs:
         delltools.transfer_clut(dev, clut_table)
-        control = '\x00' * 24                   # [:24]
-        control += '\xff\xff'                   # color
-        control += struct.pack('<H', x)         # x coord
-        control += struct.pack('<H', int(width) / 2)     # width
-        control += struct.pack('<H', int(width) / 2)     # expansion level!?
-        control += '\x00\x00'                   # sdram location
-        control += struct.pack('<H', height)    # height
-        control += struct.pack('<H', y)         # y coord
-        control += '\x14\x00'                   # transperency and patterns , 8 bits only
+        control = get_control_struct(width, height, x, y)
         delltools.mem_write(dev, addr, control)
         x = x * 3
         y = y * 2 + 10
