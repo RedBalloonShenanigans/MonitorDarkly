@@ -20,25 +20,25 @@ def upload_demo_images(dev):
 
 
 def red_hmi(dev, images):
-    red_coordinate = (0x199, 0x21b)
+    red_coordinate = (0x332, 0x21b)
     red_image_info = images['red']
     delltools.put_image(dev, red_image_info, red_coordinate[0], red_coordinate[1])
 
 
 def put_ssl_lock(dev, images):
-    lock_coordinate = (0x2f, 0x38)
+    lock_coordinate = (0x5e, 0x38)
     lock_image_info = images['lock']
     delltools.put_image(dev, lock_image_info, lock_coordinate[0], lock_coordinate[1])
 
 
 def put_shak(dev, images):
-    shak_coordinate = (0x30, 0x39)
+    shak_coordinate = (0x60, 0x39)
     shak_image_info = images['shak']
     delltools.put_image(dev, shak_image_info, shak_coordinate[0], shak_coordinate[1])
 
 
 def put_unicorn(dev, images):
-    unicorn_coordinates = (0x30, 0x39)
+    unicorn_coordinates = (0x60, 0x39)
     unicorn_image_info = images['unicorn']
     delltools.put_image(dev, unicorn_image_info, unicorn_coordinates[0], unicorn_coordinates[1])
 

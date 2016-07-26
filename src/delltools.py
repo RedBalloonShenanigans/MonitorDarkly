@@ -89,7 +89,7 @@ def put_image(dev, images_metainfo, x=0, y=0):
     transfer_clut(dev, clut_table)
     control = '\x00' * 24                           # [:24]
     control += '\x04\x04'                           # color
-    control += struct.pack('<H', x)                 # x coord
+    control += struct.pack('<H', x / 2)             # x coord
     control += struct.pack('<H', int(width) / 2)    # width
     control += struct.pack('<H', int(width) / 2)    # stride
     control += '\x00\x00'                           # sdram location
