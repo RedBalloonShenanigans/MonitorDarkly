@@ -4,6 +4,7 @@ import time
 
 from payload import X86Payload
 from protocol import Dell2410
+from image import get_control_struct
 
 VERBOSE = False
 
@@ -87,19 +88,7 @@ def put_image(dev, images_metainfo, x=0, y=0):
                 dest_stride=stride)
 
     transfer_clut(dev, clut_table)
-    control = '\x00' * 24                           # [:24]
-    control += '\x04\x04'                           # color
-    control += struct.pack('<H', x / 2)             # x coord
-    control += struct.pack('<H', int(width) / 2)    # width
-    control += struct.pack('<H', int(width) / 2)    # stride
-    control += '\x00\x00'                           # sdram location
-    control += struct.pack('<H', height)            # height
-    control += struct.pack('<H', y)                 # y coord
-    # lower 3 bits at 0x27 offset of the control structure sets up the
-    # bit per pixel mode for the monitor
-    # 011 : 4 bpp
-    # 100 : 8 bpp
-    control += '\x14\x00'          # transperency and patterns
+    control = get_control_struct(width, height, x, y)
     mem_write(dev, 0xc078, control)
 
 def sdram_read(dev, src, dest, height, width, src_stride):
