@@ -60,11 +60,13 @@ class DellImage:
     def _generate(self):
         palette = self.raw_data[PCX_CLUT_OFFSET:]
         table = ""
+        image = self.raw_data[:self.width*self.height]
+        self.colors = max(map(ord, image)) + 1
         # encode the clut the way monitor reads
-        for i in range(self.max_colors):
+        for i in range(self.colors):
             index = i * 3
             table += palette[index] + chr(0) + palette[index + 2] + palette[index + 1]
-        return self.raw_data[:self.width*self.height], table
+        return image, table
 
 def get_control_struct(width, height, x=0, y=0, sdram_loc=0):
     # note: sdram location is in units of 2^6 bytes
