@@ -24,12 +24,11 @@ def command(cmd, msg):
 
 
 class DellImage:
-    max_colors = 256
-
-    def __init__(self, filename, raw_data=None):
+    def __init__(self, filename, max_colors=256):
         self.filename = os.path.join(IMAGE_PATH, filename)
+        self.max_colors = max_colors
         self.width, self.height = self._get_image_dimensions(self.filename)
-        self.raw_data = raw_data or self._convert()
+        self.raw_data = self._convert()
         self.image, self.table = self._generate()
 
     @staticmethod
