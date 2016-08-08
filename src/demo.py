@@ -44,7 +44,7 @@ def put_unicorn(dev, images):
 
 
 def no_image(dev, images):
-    delltools.clear_0xc000(dev)
+    delltools.reg_write(0xc078 + 0x26, 0)
 
 if __name__ == "__main__":
     dell = protocol.Dell2410()

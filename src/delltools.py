@@ -50,11 +50,6 @@ def execute_payload(dev, payload, ram_addr=0x6000):
     dev.execute_2(ram_addr)
 
 
-def clear_0xc000(dev):
-    for i in range(SRAM_CMD_MEM_START, SRAM_CMD_MEM_END, 100):
-        dev.ram_write(i, '\x00' * 100)
-
-
 def upload_single_image(dev, image, upload_address):
     addr = upload_address
     width = image.width
@@ -67,7 +62,8 @@ def upload_single_image(dev, image, upload_address):
 
 
 def all_images_upload(dev, images, start_address=0x600000):
-    clear_0xc000(dev)
+    # hide existing image
+    dev.reg_write(0xc078 + 0x26, 0)
     meta_infos = []
     offset = start_address
     for image in images:
@@ -82,7 +78,8 @@ def put_image(dev, images_metainfo, x=0, y=0):
     height = images_metainfo[1]
     stride = images_metainfo[2]
     upload_address = images_metainfo[3]
-    clear_0xc000(dev)
+    # hide existing image
+    dev.reg_write(0xc078 + 0x26, 0)
     sdram_write(dev, src=upload_address,
                 dest=0, height=height, width=width,
                 dest_stride=stride)

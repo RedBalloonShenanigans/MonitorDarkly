@@ -11,11 +11,12 @@ def put_lock_8(dev, images_metainfo, x, y):
     height = images_metainfo[1]
     stride = images_metainfo[2]
     upload_address = images_metainfo[3]
-    delltools.clear_0xc000(dev)
+    control_pak_addrs = [0xc078, 0xc1e0, 0xc230, 0xc050]
+    for addr in control_pak_addrs:
+        dev.reg_write(addr + 0x26, 0)
     delltools.sdram_write(dev, src=upload_address,
                           dest=0, height=height, width=width,
                           dest_stride=stride)
-    control_pak_addrs = [0xc078, 0xc1e0, 0xc230, 0xc050]
 
     for addr in control_pak_addrs:
         delltools.transfer_clut(dev, clut_table)
