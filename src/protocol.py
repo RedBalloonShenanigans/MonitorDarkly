@@ -284,11 +284,13 @@ class Dell2410:
             print("sending: ")
             print(binascii.hexlify(cmd_bytes))
         self.dev.i2c_write(cmd_bytes, address, unk_header)
+        #time.sleep(0.5)
 
     def _i2c_read(self, addr, num_bytes):
         data = self.dev.i2c_read(addr, num_bytes)
         if self.verbose:
             self._parse_response(data)
+        #time.sleep(0.5)
         return data
 
     def _send_ddc_cmd(self, unk_header, payload, *args):
@@ -367,6 +369,7 @@ class Dell2410:
 
     def reg_read(self, address):
         self._send_gprobe_cmd('\x0a', '\x06', struct.pack(">H", address))
+        time.sleep(0.01)
         resp = self._recv_gprobe_resp(6)
         return struct.pack('<BB', resp[5], resp[4])
 
