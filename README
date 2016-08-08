@@ -5,7 +5,9 @@ The research presented here was done in order to highlight the lack of security 
 on-screen-display controllers. Please check out our Recon 0xA presentation (included) for
 a detailed description of our research findings and process.
 
-Presentation @ http://www.redballoonsecurity.com/presentation/Recon_0xA_A_Monitor_Darkly.pdf
+Original presentation @ http://www.redballoonsecurity.com/presentation/Recon_0xA_A_Monitor_Darkly.pdf
+
+DEFCON 24 presentation (with more awesomesauce) @ https://www.redballoonsecurity.com/presentation/DEFCON24_A_Monitor_Darkly.pdf
 
 Installing
 -----------
