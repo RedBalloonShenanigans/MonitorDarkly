@@ -11,17 +11,16 @@ def put_lock_8(dev, images_metainfo, x, y):
     height = images_metainfo[1]
     stride = images_metainfo[2]
     upload_address = images_metainfo[3]
-    control_pak_addrs = [0xc078, 0xc1e0, 0xc230, 0xc050]
-    for addr in control_pak_addrs:
-        dev.reg_write(addr + 0x26, 0)
+    for tile in xrange(len(delltools.SRAM_CMD_TILES)):
+        delltools.clear_tile(dev, tile)
     delltools.sdram_write(dev, src=upload_address,
                           dest=0, height=height, width=width,
                           dest_stride=stride)
 
-    for addr in control_pak_addrs:
+    for addr in delltools.SRAM_CMD_TILES:
         delltools.transfer_clut(dev, clut_table)
         control = get_control_struct(width, height, x, y)
-        delltools.mem_write(dev, addr, control)
+        delltools.mem_write(dev, addr + delltools.SRAM_CMD_MEM_START, control)
         x = x * 3
         y = y * 2 + 10
 

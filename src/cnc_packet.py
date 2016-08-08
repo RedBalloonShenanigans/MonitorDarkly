@@ -6,6 +6,7 @@ import os
 from itertools import izip_longest
 
 from image import DellImage, get_control_struct
+from delltools import SRAM_CMD_TILES
 
 def command(cmd, msg):
     try:
@@ -63,8 +64,7 @@ def build_sdram_blob(data, img_width, img_height, clut_offset, sdram_offset):
 
 def build_command_blob(x, y, img_width, img_height, sdram_offset, tile):
     control = get_control_struct(img_width, img_height, x, y, sdram_offset)
-    tiles = [0x78, 0x1e0, 0x230, 0x050]
-    offset = tiles[tile]
+    offset = SRAM_CMD_TILES[tile]
     return struct.pack('<H', offset) + control
 
 def build_image_blob(image, x, y, clut_offset=0, sdram_offset=0, tile=0):
