@@ -9,7 +9,7 @@ _main:
     pusha
 
     push #max_colors * 4 ;15 * 4
-    push #0x0       ; offset in the clut structure
+    push #0x0
     push #clut_high
     mov ax, #clut_low
     push ax

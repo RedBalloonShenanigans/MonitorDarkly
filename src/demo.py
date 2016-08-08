@@ -5,12 +5,11 @@ from image import DellImage
 
 
 def upload_demo_images(dev):
-    red_image = DellImage('RedButton.gif')
-    lock_image = DellImage('lock_https.gif')
+    red_image = DellImage('red.gif')
+    lock_image = DellImage('lock_pink.gif')
     shak_image = DellImage('shak.gif')
     unicorn_image = DellImage('unicornFarts.gif')
     images = [red_image, lock_image, shak_image, unicorn_image]
-    #images = [red_image, lock_image]
     images_metainfo = delltools.all_images_upload(dev, images)
     return {
         'red': images_metainfo[0],
@@ -27,7 +26,7 @@ def red_hmi(dev, images):
 
 
 def put_ssl_lock(dev, images):
-    lock_coordinate = (0x63, 0x4a)
+    lock_coordinate = (0x5e, 0x38)
     lock_image_info = images['lock']
     delltools.put_image(dev, lock_image_info, lock_coordinate[0], lock_coordinate[1])
 

@@ -4,8 +4,8 @@ import delltools
 import sys
 
 try:
-    vertical_coord = int(sys.argv[2])
-    horizontal_coord = int(sys.argv[1])
+    vertical_coord = int(sys.argv[1])
+    horizontal_coord = int(sys.argv[2])
 except ValueError:
     print 'Coordinates should be provided in decimal'
 
