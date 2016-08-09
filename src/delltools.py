@@ -203,9 +203,10 @@ def grab_pixel_imp(dev, vertical_coord, horizontal_coord, memory_dump_addr=0x400
     return color_val
 
 
-def transfer_clut(dev, clut_table, clut_low=0x7000):
+def transfer_clut(dev, clut_table, clut_offset=0, clut_low=0x7000):
     payload = X86Payload("transfer_clut")
     payload.replace_word(0xadad, 0x0000)  # clut_high
     payload.replace_word(0xacac, clut_low)
+    payload.replace_word(0xaeae, clut_offset)
     mem_write(dev, clut_low, clut_table)
     execute_payload(dev, payload, 0x600)
