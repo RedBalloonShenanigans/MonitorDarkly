@@ -24,7 +24,7 @@ def command(cmd, msg):
 
 
 class DellImage:
-    def __init__(self, filename, max_colors=256):
+    def __init__(self, filename, max_colors=255):
         self.filename = os.path.join(IMAGE_PATH, filename)
         self.max_colors = max_colors
         self.width, self.height = self._get_image_dimensions(self.filename)
