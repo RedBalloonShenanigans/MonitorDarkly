@@ -77,6 +77,45 @@ picked up by an SDR (we found a signal at 15.3 MHz). show_debug_irq.py shows how
 to set up an interrupt that triggers when certain addresses are read/written,
 which is useful for reverse-engineering.
 
+Command-and-Control (Defcon demo)
+----------------------------------
+
+The command-and-control demo shows how an attacker might use the ability to read
+and modify pixels for malicious purposes. src/cnc.py is a small script that
+executes a payload located in payloads/cnc.s. cnc.s hooks a few locations in the
+monitor's firmware in order to receive packets through a hard-coded
+three-pixel-large area. It can then do several things based on the packet
+received, including write to memory, execute code, and display images. The
+modifications it makes won't persist across reboots, but they could be made to
+do so through writing to the flash. There are two demos included that show cnc.s
+in action:
+
+1. In src/cnc_display.py, there is a script that uses pygame to take over the
+screen and send packets to the monitor. First, it sends a "display" packet to
+display a lock on the screen, and then it uses a special packet type to tell the
+monitor where the mouse cursor is. cnc.s is currently hardcoded to change the
+location of the image when it receives one of these packets, so the image moves
+with the cursor and hides it. Press 'q' to quit. Note that the entire time, all
+cnc_display.py is doing is displaying packets -- it's the monitor that does the
+rest.
+
+2. The second demo, shown at defcon, involves a malicious server that sends a
+gif including a packet. That packet overrides data on another page (in this
+case, the value of your paypal account) by displaying an image over it. The
+server, written using flask, is located at src/serve.py, and a screenshot of the
+paypal page used in the demo is included in images/paypal_screenshot.png. The
+source code of the page isn't included for copyright reasons. Note that to get
+this to work on another machine, you probably need to tweak the location of the
+packet (h_offset and v_offset in cnc.s) and the location where the data is
+displyed (in serve.py). Also, the server currently expects a file called
+amount.txt where you enter the amount you want displayed on the screen.
+
+For this to work, the monitor firmware must be version m1f1a, or else the
+monitor will crash since the hook won't be in the right place. Also, since we're
+reading raw color values from the computer and interpreting them as bytes,
+anything that modifies those color values, such as f.lux or redshift, will break
+the demo.
+
 How does it work?
 -----------------
 

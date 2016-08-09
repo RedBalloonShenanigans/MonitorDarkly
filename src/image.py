@@ -24,12 +24,11 @@ def command(cmd, msg):
 
 
 class DellImage:
-    max_colors = 256
-
-    def __init__(self, filename, raw_data=None):
+    def __init__(self, filename, max_colors=256):
         self.filename = os.path.join(IMAGE_PATH, filename)
+        self.max_colors = max_colors
         self.width, self.height = self._get_image_dimensions(self.filename)
-        self.raw_data = raw_data or self._convert()
+        self.raw_data = self._convert()
         self.image, self.table = self._generate()
 
     @staticmethod
@@ -61,11 +60,13 @@ class DellImage:
     def _generate(self):
         palette = self.raw_data[PCX_CLUT_OFFSET:]
         table = ""
+        image = self.raw_data[:self.width*self.height]
+        self.colors = max(map(ord, image)) + 1
         # encode the clut the way monitor reads
-        for i in range(self.max_colors):
+        for i in range(self.colors):
             index = i * 3
             table += palette[index] + chr(0) + palette[index + 2] + palette[index + 1]
-        return self.raw_data[:self.width*self.height], table
+        return image, table
 
 def get_control_struct(width, height, x=0, y=0, sdram_loc=0):
     # note: sdram location is in units of 2^6 bytes

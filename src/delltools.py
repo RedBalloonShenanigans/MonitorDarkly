@@ -14,6 +14,7 @@ FREE_REG_ADDR_END = 0x3a60
 
 SRAM_CMD_MEM_START = 0xc000
 SRAM_CMD_MEM_END = 0xc800
+SRAM_CMD_TILES = [0x78, 0x1e0, 0x230, 0x50]
 SEGMENT_MAX_LIMIT = 2 ** 16
 
 
@@ -50,24 +51,24 @@ def execute_payload(dev, payload, ram_addr=0x6000):
     dev.execute_2(ram_addr)
 
 
-def clear_0xc000(dev):
-    for i in range(SRAM_CMD_MEM_START, SRAM_CMD_MEM_END, 100):
-        dev.ram_write(i, '\x00' * 100)
-
-
-def upload_single_image(dev, image, upload_address):
+def upload_single_image(dev, image, upload_address, clut_offset=0):
     addr = upload_address
     width = image.width
     stride = image.width
     height = image.height
-    mem_write(dev, addr, image.image)
-    addr += len(image.image)
+    if clut_offset == 0:
+        image_data = image.image
+    else:
+        image_data = "".join(chr(ord(b) + clut_offset) for b in image.image)
+    mem_write(dev, addr, image_data)
+    addr += len(image_data)
     print "uploaded image at %s, size %s" % (hex(upload_address), hex(len(image.image)))
-    return (width, height, stride, upload_address, image.table), addr
+    return (width, height, stride, upload_address, clut_offset, image.table), addr
 
 
 def all_images_upload(dev, images, start_address=0x600000):
-    clear_0xc000(dev)
+    # hide existing image
+    clear_tile(dev)
     meta_infos = []
     offset = start_address
     for image in images:
@@ -76,20 +77,25 @@ def all_images_upload(dev, images, start_address=0x600000):
     return meta_infos
 
 
-def put_image(dev, images_metainfo, x=0, y=0):
-    clut_table = images_metainfo[4]
+def put_image(dev, images_metainfo, x=0, y=0, sdram_loc=0, tile=0):
+    clut_offset = images_metainfo[4]
+    clut_table = images_metainfo[5]
     width = images_metainfo[0]
     height = images_metainfo[1]
     stride = images_metainfo[2]
     upload_address = images_metainfo[3]
-    clear_0xc000(dev)
+    # hide existing image
+    clear_tile(dev, tile)
     sdram_write(dev, src=upload_address,
-                dest=0, height=height, width=width,
+                dest=sdram_loc << 6, height=height, width=width,
                 dest_stride=stride)
 
-    transfer_clut(dev, clut_table)
-    control = get_control_struct(width, height, x, y)
-    mem_write(dev, 0xc078, control)
+    transfer_clut(dev, clut_table, clut_offset * 4)
+    control = get_control_struct(width, height, x, y, sdram_loc)
+    mem_write(dev, SRAM_CMD_MEM_START + SRAM_CMD_TILES[tile], control)
+
+def clear_tile(dev, tile=0):
+    mem_write(dev, SRAM_CMD_MEM_START + SRAM_CMD_TILES[tile] + 0x26, '\x00')
 
 def sdram_read(dev, src, dest, height, width, src_stride):
     # The IROM sdram_read function has a similar bug to sdram_write, where the
@@ -206,9 +212,10 @@ def grab_pixel_imp(dev, vertical_coord, horizontal_coord, memory_dump_addr=0x400
     return color_val
 
 
-def transfer_clut(dev, clut_table, clut_low=0x7000):
+def transfer_clut(dev, clut_table, clut_offset=0, clut_low=0x7000):
     payload = X86Payload("transfer_clut")
     payload.replace_word(0xadad, 0x0000)  # clut_high
     payload.replace_word(0xacac, clut_low)
+    payload.replace_word(0xaeae, clut_offset)
     mem_write(dev, clut_low, clut_table)
     execute_payload(dev, payload, 0x600)

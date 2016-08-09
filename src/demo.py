@@ -6,7 +6,7 @@ from image import DellImage
 
 def upload_demo_images(dev):
     red_image = DellImage('red.gif')
-    lock_image = DellImage('lock_pink.gif')
+    lock_image = DellImage('lock_https.gif')
     shak_image = DellImage('shak.gif')
     unicorn_image = DellImage('unicornFarts.gif')
     images = [red_image, lock_image, shak_image, unicorn_image]
@@ -44,7 +44,7 @@ def put_unicorn(dev, images):
 
 
 def no_image(dev, images):
-    delltools.clear_0xc000(dev)
+    delltools.clear_tile(dev)
 
 if __name__ == "__main__":
     dell = protocol.Dell2410()
