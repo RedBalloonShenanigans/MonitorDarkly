@@ -51,6 +51,9 @@ Note that demo.py needs root permissions to run. It will first load all the
 images, which takes a few minutes, and then you'll be presented with a prompt to
 choose the exploit you want to run.
 
+ThingPwner2 (USB Armory)
+------------------------
+
 In addition to demo.py, src/gpio.py contains a script designed to run on the USB
 Armory which uses buttons connected to the GPIO pins to launch the demos. You
 can create a script to have it run on boot, for example with systemd install
@@ -71,6 +74,12 @@ and then on the commandline:
     systemctl enable gpio.service
 
 To start it at boot.
+
+By default, src/gpio.py uses GPIO pins GPIO5[26] and GPIO5[30] for switching between and launching the attacks; these are pin 3 and pin 7 on the USB Armory Mk1. Different GPIO pins can be configured to be used in src/gpio.py. For this to work, a switch has to be connected to each of the two GPIO pins with a pullup resistor to power (pin 2). This can be done by soldering some header pins, buttons, and resistors.
+Armory Wiki: https://github.com/inversepath/usbarmory/wiki/GPIOs
+
+The armory then has to be configured to be in host mode (see wiki for info) and needs the host adapter. A USB cable can be connected to the host adapter and to the USB B port on the back of the 2410U. During its boot up, it will start blinking the LED. If configured correctly, the LED should stop blinking, which means that the GPIO service has correctly started and grabbed the LED. Pressing on the "switch image" will switch between the attacks and blink the LED a number of times corresponding to the attack number. Finally, the "launch" button will execute the attack. The image should appear on the screen. (Read the FAQ below)
+
 
 There are two other demos included. funtenna.py toggles a GPIO pin, which can be
 picked up by an SDR (we found a signal at 15.3 MHz). show_debug_irq.py shows how
